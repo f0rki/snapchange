@@ -4,7 +4,7 @@
 
 Execute the build script. This will copy the `fuzzer_template` locally and build the raw
 linux image. This image will then be copied into the guest to be used as a basis for
-each snapshot.
+each snapshot. The docker image will then be built.
 
 _TODO: Figure out if building the entire image in a single Docker is feesible._
 
@@ -14,8 +14,8 @@ _TODO: Figure out if building the entire image in a single Docker is feesible._
 
 ## Taking a snapshot
 
-The `start.sh` script is used in the container to take the snapshot. This script expects the command 
-used to take the snapshot as arguments to executing the containing. 
+The `start.sh` script (the entrypoint of the docker) is used in the container to take the snapshot. This script expects 
+the command used to take the snapshot as arguments to executing the containing. 
 
 We can take a snapshot of [Example 1](../examples/01_getpid) as the following.
 
