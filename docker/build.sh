@@ -16,4 +16,4 @@ echo "Compressing the raw linux image"
 pigz fuzzer_template/qemu_snapshot/IMAGE/bookworm.img
 
 # Build the docker container
-docker build -t snapchange_test .
+docker build -t snapchange .
