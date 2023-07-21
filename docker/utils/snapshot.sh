@@ -63,7 +63,7 @@ function start_vm {
         -m "$QEMU_MEM" \
         -smp 1 \
         -kernel "$KERNEL" \
-        -append "console=ttyS0 root=/dev/sda earlyprintk=serial mitigations=off" \
+        -append "console=ttyS0 root=/dev/sda earlyprintk=serial init=/init mitigations=off" \
         -drive "file=/snapchange/$RELEASE.img" \
         -net user,host=10.0.2.10,hostfwd=tcp:127.0.0.1:10021-:22 \
         -net nic,model=e1000 \
