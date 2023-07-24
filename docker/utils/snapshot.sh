@@ -17,6 +17,12 @@ if [[ -z "$SNAPSHOT_USER" ]]; then
 else
     USER="$SNAPSHOT_USER"
 fi
+if [[ -z "$SNAPSHOT_KERNEL_IMG" ]]; then
+  SNAPSHOT_KERNEL_IMG=""
+fi
+if [[ -z "$SNAPSHOT_KERNEL_ELF" ]]; then
+  SNAPSHOT_KERNEL_ELF=""
+fi
 if [[ -z "$LIBFUZZER" ]]; then 
     LIBFUZZER=0
 fi
@@ -39,7 +45,9 @@ set -eu -o pipefail
 function start_vm {
   QEMU="/snapchange/QEMU/build/qemu-system-x86_64"
   KERNEL="/snapchange/linux.bzImage"
-  if [[ "$KASAN" -eq 1 ]]; then
+  if [[ -n "$SNAPSHOT_KERNEL_IMG" ]]; then
+    KERNEL="$SNAPSHOT_KERNEL_IMG"
+  elif [[ "$KASAN" -eq 1 ]]; then
     KERNEL="/snapchange/linux.kasan.bzImage"
   fi
 
@@ -147,11 +155,21 @@ function extract_output {
 # Create the output directory
 mkdir -p $OUTPUT || true
 
-# Copy over the `vmlinux` into the output directory
-if [[ "$KASAN" -eq 1 ]]; then
-    cp /snapchange/vmlinux.kasan "$OUTPUT/vmlinux"
+if [[ -n "$SNAPSHOT_KERNEL_IMG" ]]; then
+  cp "$SNAPSHOT_KERNEL_IMG" "$OUTPUT/vmlinux.bzimg"
+  if [[ -n "$SNAPSHOT_KERNEL_ELF" ]]; then
+    cp "$SNAPSHOT_KERNEL_ELF" "$OUTPUT/vmlinux"
+  else
+    echo "[WARNING] couldn't find vmlinux corresponding to bootable kernel image '$SNAPSHOT_KERNEL_IMG'."
+    echo "[WARNING] please set the variable SNAPSHOT_KERNEL_ELF for kernel symbols!"
+  fi
 else
-    cp /snapchange/vmlinux "$OUTPUT/vmlinux"
+  # Copy over the `vmlinux` into the output directory
+  if [[ "$KASAN" -eq 1 ]]; then
+      cp /snapchange/vmlinux.kasan "$OUTPUT/vmlinux"
+  else
+      cp /snapchange/vmlinux "$OUTPUT/vmlinux"
+  fi
 fi
 
 # Start the VM

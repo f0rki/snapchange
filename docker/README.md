@@ -56,6 +56,9 @@ There are several environment options that control how snapchange creates a snap
   * for example: `SNAPSHOT_EXTRACT="/etc/fstab /usr/lib/libc.so"`
 * `SNAPSHOT_INPUT="/image/"` - the path where the snapshot input is stored. Ususally you don't need to change that.
 * `SNAPSHOT_CHOWN_TO="1000"` - the snapshot is `chown -R`'ed for convenience. Set to `""` to disable.
+* to specify a custom kernel:
+  * `SNAPSHOT_KERNEL_IMG` - path to bootable kernel image ("bzimage") passed to qemu's direct kernel boot.
+  * `SNAPSHOT_KERNEL_ELF` - path to unstripped kernel ELF file - used to lookup kernel symbols.
 
 There are some more specialized options that you can pass to the snapshoting.
 
