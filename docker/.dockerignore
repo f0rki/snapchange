@@ -1,1 +1,2 @@
 fuzzer_template/target/
+fuzzer_template/Cargo.lock
