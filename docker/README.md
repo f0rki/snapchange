@@ -20,6 +20,8 @@ RUN cd /opt/ && make clean && make
 [...]
 ```
 
+Note that for best results, you should install gdb with python inside of your root filesystem.
+
 
 ### Step 2: Prepare the snapshoting container
 
@@ -62,6 +64,6 @@ There are several environment options that control how snapchange creates a snap
 
 There are some more specialized options that you can pass to the snapshoting.
 
-* `LIBFUZZER=0` - set to 1 to use a KASAN-enabled kernel.
+* `LIBFUZZER=0` - set to 1 to enable special handling of creating snapshots from libfuzzer fuzzing harnesses.
 * `KASAN=0` - set to 1 to use a KASAN-enabled kernel.
 * `TEMPLATE_OUT="/out/"` - if you run the container with `template` as first argument, it will copy a rust fuzzer template into this directory.
