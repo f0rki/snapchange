@@ -1,7 +1,7 @@
 #!/bin/bash
 set -ex
 
-pushd ../_docker
+pushd ../../../docker
 docker build -t snapchange .
 popd
 
