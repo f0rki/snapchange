@@ -212,7 +212,7 @@ cp gdbsnapshot.py $DIR/$GDBPY
 chmod a+r "$DIR/$GDBPY"
 
 # Try to remove the old gdbcmds since we are writing a new one below
-rm $DIR$/GDBCMDS || true
+rm $DIR/$GDBCMDS || true
 
 # Execute to the first int3, execute the gdbsnapshot, execute vmcall, then exit
 if [[ "$LIBFUZZER" -eq 1 ]]; then
