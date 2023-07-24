@@ -6,14 +6,11 @@
 
 use anyhow::Result;
 
-use snapchange::addrs::{Cr3, VirtAddr};
-use snapchange::fuzzer::{Breakpoint, BreakpointLookup, BreakpointType, Fuzzer};
+use snapchange::addrs::VirtAddr;
+use snapchange::fuzzer::Fuzzer;
 use snapchange::fuzzvm::FuzzVm;
-use snapchange::Execution;
 
 use crate::constants;
-
-const CR3: Cr3 = Cr3(constants::CR3);
 
 #[derive(Default)]
 pub struct Example1Fuzzer {
@@ -23,13 +20,18 @@ pub struct Example1Fuzzer {
 impl Fuzzer for Example1Fuzzer {
     type Input = Vec<u8>;
     const START_ADDRESS: u64 = constants::RIP;
-    // const INPUT_ADDRESS: u64 = constants::INPUT;
-    const MAX_INPUT_LENGTH: usize = 128;
-    const MAX_MUTATIONS: u64 = 2;
+    const MAX_INPUT_LENGTH: usize = 1024;
 
     fn set_input(&mut self, input: &Self::Input, fuzzvm: &mut FuzzVm<Self>) -> Result<()> {
-        // Write the mutated input
-        fuzzvm.write_bytes_dirty(VirtAddr(constants::INPUT), CR3, &input)?;
+        // Restore RIP to before the `int3 ; vmcall` snapshot point
+        fuzzvm.set_rip(fuzzvm.rip() - 4);
+
+        // Set the data buffer to the current mutated input
+        let buffer = fuzzvm.rdi();
+        fuzzvm.write_bytes_dirty(VirtAddr(buffer), fuzzvm.cr3(), input)?;
+
+        // Set the length of the input
+        fuzzvm.set_rsi(input.len() as u64);
 
         Ok(())
     }

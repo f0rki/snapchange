@@ -19,11 +19,4 @@ fn main() {
     let captures = re.captures(&qemuregs).unwrap();
     let rip = &captures.get(1).unwrap().as_str();
     writeln!(w, "pub const RIP: u64 = 0x{};", rip).unwrap();
-
-    let vmlog = fs::read_to_string("./snapshot/vm.log").unwrap();
-    // SNAPSHOT Data buffer: 0x4c8100
-    let re = Regex::new(r"SNAPSHOT Data buffer: (0x[0-9A-Fa-f]+)").unwrap();
-    let captures = re.captures(&vmlog).unwrap();
-    let input_addr = &captures.get(1).unwrap().as_str();
-    writeln!(w, "pub const INPUT: u64 = {};", input_addr).unwrap();
 }
