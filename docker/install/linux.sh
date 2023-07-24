@@ -51,6 +51,7 @@ make defconfig
 ./scripts/config --set-val BINFMT_SCRIPT y
 ./scripts/config --set-val BINFMT_ELF y
 
+# we use 9pfs to transfer files via qemu to the host
 ./scripts/config --set-val CONFIG_NET_9P y
 ./scripts/config --set-val CONFIG_NET_9P_VIRTIO y
 # ./scripts/config --set-val CONFIG_NET_9P_DEBUG y
@@ -58,6 +59,9 @@ make defconfig
 ./scripts/config --set-val CONFIG_9P_FS_POSIX_ACL y
 ./scripts/config --set-val CONFIG_PCI y
 ./scripts/config --set-val CONFIG_VIRTIO_PCI y
+
+# enable such that we can also run our bundled gdb.static
+./scripts/config --set-val CONFIG_USER_NS y
 
 yes "" | make -j "$(nproc)" bzImage
 

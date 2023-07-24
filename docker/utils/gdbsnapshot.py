@@ -6,7 +6,10 @@ import json
 import sys
 from pathlib import Path
 
+print("[gdbsnapshot.py loaded]")
+
 symbols = defaultdict(list)
+
 
 def collect_kernel_symbols():
     ''' Attempt to dump the kernel symbols. Fails if GDB is not ran as root '''
@@ -266,4 +269,6 @@ def write_symbols(symbols_file):
         for (addr, sym) in sorted(final_results):
             f.write(f"{addr:#x} {sym}\n")
 
+print("[gdbsnapshot.py] writing symbols")
 write_symbols("/tmp/gdb.symbols")
+print("[gdbsnapshot.py] done")

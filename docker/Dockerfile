@@ -1,3 +1,22 @@
+# this is a bit of a hack to get an essentially statically linked gdb
+FROM nixos/nix:latest as bundler
+# bundle as self-extracting sh/arx archive.
+ARG NIX_BUNDLER=""
+# ARG NIX_BUNDLER="--bundler github:matthewbauer/nix-bundle"
+# doesn't work in plain docker due to fuse requirements.
+# ARG NIX_BUNDLER="--bundler github:ralismark/nix-appimage"
+ARG NIX_BUNDLE_PKG="nixpkgs#gdb"
+RUN set -ex; nix-channel --list; \
+  nix-channel --update \
+  && echo "experimental-features = nix-command flakes" >> /etc/nix/nix.conf \
+  && nix bundle $NIX_BUNDLER $NIX_BUNDLE_PKG \
+    || nix bundle $NIX_BUNDLER $NIX_BUNDLE_PKG \
+    || nix bundle $NIX_BUNDLER $NIX_BUNDLE_PKG \
+  && cp gdb /gdb.static \
+  && nix-collect-garbage -d
+# /gdb.static is now a bundled version of gdb with all dependencies.
+
+# now build the actual snapchange container
 FROM ubuntu:20.04
 
 # Install prereqs
@@ -35,6 +54,9 @@ ENV KASAN="$KASAN"
 
 ARG BUSYBOX_STATIC="/busybox.static"
 ENV BUSYBOX_STATIC="$BUSYBOX_STATIC"
+ARG GDB_STATIC="/gdb.static"
+ENV GDB_STATIC="$GDB_STATIC"
+
 RUN ./install/qemu.sh \
   && ./install/ghidra.sh \
   && ./install/linux.sh \
@@ -46,6 +68,8 @@ RUN ./install/qemu.sh \
 
 COPY ./utils/* /snapchange/
 RUN chmod +x *.sh && test -x go.sh
+
+COPY --from=bundler /gdb.static /snapchange/gdb.static
 
 ARG SNAPSHOT_USER="root"
 ENV SNAPSHOT_USER="$USER"

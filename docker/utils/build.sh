@@ -83,6 +83,11 @@ mkdir -p "$DIR/$HOMEDIR"
 
 RC_LOCAL="$DIR/etc/rc.local"
 
+GDBCMDS="/usr/snapchange/snapshot.gdbcmds"
+GDBPY="/usr/snapchange/gdbsnapshot.py"
+mkdir -p "$(dirname "$DIR/$GDBCMDS")"
+mkdir -p "$(dirname "$DIR/$GDBPY")"
+
 # Remove previous snapshot script
 rm "$RC_LOCAL" || true
 
@@ -96,6 +101,25 @@ echo "[+] snapshotting program: $SNAPSHOT_ENTRYPOINT $SNAPSHOT_ENTRYPOINT_ARGUME
 
 EOF
 
+DIR_HAS_GDB=0
+if [[ -n "$(find "$DIR" -name gdb -type f)" ]]; then
+  DIR_HAS_GDB=1
+  # use root fs provided gdb and hope for the best
+  echo "export GDB=gdb" >> "$RC_LOCAL"
+else
+  DIR_HAS_GDB=0
+  cat >> "$RC_LOCAL" <<EOF
+
+if ! command -v gdb; then
+    echo "[+] no gdb found - falling back to /gdb.static"
+    export GDB=/gdb.static
+else
+    export GDB=gdb
+fi
+
+EOF
+fi
+
 if [[ -z "$SNAPSHOT_ENTRYPOINT_CWD" ]]; then
     echo "cd $HOMEDIR || true" >> "$RC_LOCAL"
 else
@@ -107,7 +131,7 @@ fi
 if [ $USER != 'root' ]; then
     cat > "$RC_LOCAL" <<EOF
 echo "[+] obtaining kernel symbols by running gdb under gdb"
-gdb --command=$HOMEDIR/gdbcmds --args gdb
+\$GDB --command=$GDBCMDS --args \$GDB
 mv /tmp/gdb.symbols /tmp/gdb.symbols.root
 rm /tmp/gdb.modules
 rm /tmp/gdb.vmmap
@@ -121,7 +145,7 @@ if [ $USER != 'root' ]; then
 fi
 
 # Create the script to start on boot
-echo -n "gdb --batch --command=$HOMEDIR/gdbcmds --args "$SNAPSHOT_ENTRYPOINT" $SNAPSHOT_ENTRYPOINT_ARGUMENTS"  >> $RC_LOCAL
+echo -n "\$GDB --batch --command=$GDBCMDS --args "$SNAPSHOT_ENTRYPOINT" $SNAPSHOT_ENTRYPOINT_ARGUMENTS" >> $RC_LOCAL
 
 # If user is not root, close the command executed
 if [ $USER != 'root' ]; then
@@ -171,16 +195,18 @@ chown root:root $RC_LOCAL
 echo "" >> $RC_LOCAL
 
 # Copy in the gdbsnapshot.py
-cp gdbsnapshot.py $DIR$HOMEDIR/gdbsnapshot.py
+cp gdbsnapshot.py $DIR/$GDBPY
+chmod a+r "$DIR/$GDBPY"
 
 # Try to remove the old gdbcmds since we are writing a new one below
-rm $DIR$HOMEDIR/gdbcmds || true
+rm $DIR$/GDBCMDS || true
 
 # Execute to the first int3, execute the gdbsnapshot, execute vmcall, then exit
 if [[ "$LIBFUZZER" -eq 1 ]]; then
     echo "LIBFUZZER SNAPSHOT DETECTED"
     echo "Taking a snapshot at LLVMFuzzerTestOneInput"
-    cat > "$DIR$HOMEDIR/gdbcmds" <<EOF
+    cat > "$DIR/$GDBCMDS" <<EOF
+set pagination off
 # Ignore leak detection. 
 set environment ASAN_OPTIONS=detect_leaks=0
 
@@ -226,23 +252,24 @@ set {unsigned char}(LLVMFuzzerTestOneInput+0xf)=0xcd
 
 # Continue execution until the LLVMFuzzerTestOneInput and take the snapshot as normal
 continue
-source $HOMEDIR/gdbsnapshot.py
+source $GDBPY
 ni
 ni
 quit
 
 EOF
 else
-    cat > "$DIR$HOMEDIR/gdbcmds" <<EOF
+    cat > "$DIR/$GDBCMDS" <<EOF
 set pagination off
 run
-source $HOMEDIR/gdbsnapshot.py
+source $GDBPY
 ni
 ni
 quit
 
 EOF
 fi
+chmod a+r "$DIR/$GDBCMDS"
 
 
 # e.g., if we are in initramfs we need a script to run `/etc/rc.local`
@@ -288,6 +315,14 @@ fi
 # copy some required utils
 # statically built busybox installed from system package
 cp "$(which busybox)" "$DIR/$BUSYBOX_STATIC"
+if [[ "$DIR_HAS_GDB" -eq 0 ]]; then
+  # copy the static bundle of gdb into image
+  cp /snapchange/gdb.static "$DIR/$GDB_STATIC"
+  # we use the static busybox instead of the system installed hexdump here.
+  # some system (notably ubuntu) do not ship with the hexdump utility in docker containers.
+  sed -i -e "1,15s!hexdump!$BUSYBOX_STATIC hexdump!g" "$DIR/$GDB_STATIC"
+fi
+
 
 echo "!!! Sanity check the root directory !!!"
 ls -la $DIR
