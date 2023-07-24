@@ -256,9 +256,15 @@ echo "[+] Mounting /dev /proc /sys"
 mount -t devtmpfs dev /dev
 mount -t proc proc /proc
 mount -t sysfs sysfs /sys
+mount -t tmpfs tmpfs /tmp
 
 echo "[+] bringing up loopback netdevice"
-ip link set up dev lo
+
+if command -v ip >/dev/null 2>&1; then
+  ip link set up dev lo
+else
+  ifconfig lo: 127.0.0.1 netmask 255.0.0.0 up
+fi
 
 # for interactive use - enable shell prompt
 # /sbin/getty -n -l /bin/sh 115200 /dev/console
@@ -272,12 +278,16 @@ fi
 
 
 echo "[+] poweroff"
-poweroff -f
+# try several poweroff/shutdown options... otherwise. kernel panic.
+poweroff -f || shutdown -P now || busybox poweroff -f || /busybox poweroff -f || $BUSYBOX_STATIC poweroff -f
 
 EOF
     chmod +x "$DIR/init"
 fi
 
+# copy some required utils
+# statically built busybox installed from system package
+cp "$(which busybox)" "$DIR/$BUSYBOX_STATIC"
 
 echo "!!! Sanity check the root directory !!!"
 ls -la $DIR

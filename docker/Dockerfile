@@ -16,6 +16,7 @@ RUN apt-get update -q \
     libguestfs-tools \
     lz4 \
     linux-image-generic \
+    busybox-static \
   && apt-get clean -y \
   && rm -rf /var/lib/apt/lists/*
 
@@ -32,6 +33,8 @@ ARG LINUX_VERSION=""
 ARG KASAN=0
 ENV KASAN="$KASAN"
 
+ARG BUSYBOX_STATIC="/busybox.static"
+ENV BUSYBOX_STATIC="$BUSYBOX_STATIC"
 RUN ./install/qemu.sh \
   && ./install/ghidra.sh \
   && ./install/linux.sh \

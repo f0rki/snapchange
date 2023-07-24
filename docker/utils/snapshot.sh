@@ -182,7 +182,7 @@ sleep 1
 while true; do
     # Login prompt signals that the /etc/rc.local script executed and can extract output
     # Status code of 0 means the login prompt was found in the vm.log
-    if grep -e "\(linux login:\|snapshot done\)" vm.log 2>&1 >/dev/null || check_vm_halted; then
+    if grep -e "\(linux login:\|snapshot done\|Attempted to kill init\)" vm.log 2>&1 >/dev/null || check_vm_halted; then
         echo "[snapshot.sh] Finished booting.. extracting gdb output";
         extract_output
 
@@ -203,7 +203,7 @@ while true; do
         break
     fi
 
-    echo "[snapshot.sh] Waiting for login prompt.."
+    echo "[snapshot.sh] Waiting for VM..."
     sleep 2
 done
 
