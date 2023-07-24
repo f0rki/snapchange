@@ -44,7 +44,7 @@ if [[ -z "$SNAPSHOT_ENTRYPOINT_CWD" ]]; then
 fi
 
 set -eu -o pipefail
-set -x
+# set -x
 
 BIN="$DIR/$SNAPSHOT_ENTRYPOINT"
 
@@ -108,6 +108,19 @@ if [[ -n "$(find "$DIR" -name gdb -type f)" ]]; then
   echo "export GDB=gdb" >> "$RC_LOCAL"
 else
   DIR_HAS_GDB=0
+
+  echo "[WARNING] "
+  echo "[WARNING] "
+  echo "[WARNING] "
+  echo "[WARNING] "
+  echo "[WARNING] it seems there is no gdb installed in the harness root filesystem"
+  echo "[WARNING] we are going to do our best to inject gdb, but this will likely"
+  echo "[WARNING] fail, so please just install gdb."
+  echo "[WARNING] "
+  echo "[WARNING] "
+  echo "[WARNING] "
+  echo "[WARNING] "
+
   cat >> "$RC_LOCAL" <<EOF
 
 if ! command -v gdb; then
