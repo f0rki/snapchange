@@ -5,7 +5,11 @@
 if [[ -z "$SNAPSHOT_INPUT" ]]; then
     DIR=/image/
 else
+  if [[ -d "$SNAPSHOT_INPUT" ]]; then
     DIR="$SNAPSHOT_INPUT"
+  else
+    DIR=/image/
+  fi
 fi
 if [[ -z "$SNAPSHOT_OUTPUT" ]]; then
   OUTPUT=/snapshot/
@@ -29,12 +33,8 @@ fi
 if [[ -z "$SNAPSHOT_EXTRACT" ]]; then
   SNAPSHOT_EXTRACT=""
 fi
-
-RELEASE=harness
-
-if [[ -z "$SNAPSHOT_ENTRYPOINT" ]]; then
-    echo "[ERROR] reuqire setting a SNAPSHOT_ENTRYPOINT"
-    exit 1
+if [[ -z "$SNAPSHOT_CHECK_FOR_GDB" ]]; then
+  SNAPSHOT_CHECK_FOR_GDB=1
 fi
 if [[ -z "$SNAPSHOT_ENTRYPOINT_ARGUMENTS" ]]; then
     SNAPSHOT_ENTRYPOINT_ARGUMENTS=""
@@ -43,16 +43,38 @@ if [[ -z "$SNAPSHOT_ENTRYPOINT_CWD" ]]; then
     SNAPSHOT_ENTRYPOINT_CWD=""
 fi
 
+source /snapchange/log.sh || { echo "Failed to source /snapchange/log.sh"; exit 1; }
+
+RELEASE=harness
+
+if [[ -z "$SNAPSHOT_ENTRYPOINT" ]]; then
+    log_error "require setting a SNAPSHOT_ENTRYPOINT"
+    exit 1
+fi
+
 set -eu -o pipefail
 # set -x
 
+if ! [[ -d "$SNAPSHOT_INPUT" ]]; then
+  mkdir -p "$DIR" || true
+  pushd "$dir" >/dev/null
+  tar -xf "$SNAPSHOT_INPUT"
+  popd >/dev/null
+fi
+
+log_msg "preparing harnes root filesystem for snapshot"
+
 BIN="$DIR/$SNAPSHOT_ENTRYPOINT"
+
+if ! [[ -e "$BIN" ]]; then
+  log_error "harness root filesystem does not contain entrypoint $SNAPSHOT_ENTRYPOINT"
+  exit 1
+fi
 
 cp "$BIN" "$OUTPUT/$(basename "$BIN").bin"
 if ! [[ -z "$SNAPSHOT_EXTRACT" ]]; then
   mkdir -p "$OUTPUT/image"
   for file in $SNAPSHOT_EXTRACT; do
-    echo "$file"
     dest="$OUTPUT/image/$file"
     mkdir -p "$(dirname "$dest")" || true
     cp -r "$DIR/$file" "$dest"
@@ -62,7 +84,7 @@ fi
 if [[ "$LIBFUZZER" -eq 1 ]]; then 
 
     if ! nm "$BIN" | grep LLVMFuzzerTestOneInput; then
-        echo "LLVMFuzzerTestOneInput not found in $BIN."
+        log_error "LLVMFuzzerTestOneInput not found in $BIN."
         exit 1
     fi
     
@@ -83,10 +105,10 @@ mkdir -p "$DIR/$HOMEDIR"
 
 RC_LOCAL="$DIR/etc/rc.local"
 
-GDBCMDS="/usr/snapchange/snapshot.gdbcmds"
-GDBPY="/usr/snapchange/gdbsnapshot.py"
-mkdir -p "$(dirname "$DIR/$GDBCMDS")"
-mkdir -p "$(dirname "$DIR/$GDBPY")"
+GDBCMDS="/snapchange/snapshot.gdbcmds"
+GDBPY="/snapchange/gdbsnapshot.py"
+mkdir -p "$(dirname "$DIR/$GDBCMDS")" || true
+mkdir -p "$(dirname "$DIR/$GDBPY")" || true
 
 # Remove previous snapshot script
 rm "$RC_LOCAL" || true
@@ -102,35 +124,20 @@ echo "[+] snapshotting program: $SNAPSHOT_ENTRYPOINT $SNAPSHOT_ENTRYPOINT_ARGUME
 EOF
 
 DIR_HAS_GDB=0
-if [[ -n "$(find "$DIR" -name gdb -type f)" ]]; then
+GDB_PATH="$(find "$DIR" -name gdb -type f | head -n 1)"
+if [[ -n "$GDB_PATH" ]]; then
   DIR_HAS_GDB=1
-  # use root fs provided gdb and hope for the best
-  echo "export GDB=gdb" >> "$RC_LOCAL"
+  echo "export GDB=$GDB_PATH" >> "$RC_LOCAL"
 else
   DIR_HAS_GDB=0
 
-  echo "[WARNING] "
-  echo "[WARNING] "
-  echo "[WARNING] "
-  echo "[WARNING] "
-  echo "[WARNING] it seems there is no gdb installed in the harness root filesystem"
-  echo "[WARNING] we are going to do our best to inject gdb, but this will likely"
-  echo "[WARNING] fail, so please just install gdb."
-  echo "[WARNING] "
-  echo "[WARNING] "
-  echo "[WARNING] "
-  echo "[WARNING] "
-
-  cat >> "$RC_LOCAL" <<EOF
-
-if ! command -v gdb; then
-    echo "[+] no gdb found - falling back to /gdb.static"
-    export GDB=/gdb.static
-else
-    export GDB=gdb
-fi
-
-EOF
+  if [[ "$SNAPSHOT_CHECK_FOR_GDB" -eq 1 ]]; then
+    log_error "no gdb found in the harness root filesystem!"
+    exit 1
+  else
+    log_warning "no gdb found in the harness root filesystem! continuing anyway (hopefully gdb is on the PATH )"
+    echo "export GDB=gdb" >> "$RC_LOCAL"
+  fi
 fi
 
 if [[ -z "$SNAPSHOT_ENTRYPOINT_CWD" ]]; then
@@ -328,29 +335,24 @@ fi
 # copy some required utils
 # statically built busybox installed from system package
 cp "$(which busybox)" "$DIR/$BUSYBOX_STATIC"
-if [[ "$DIR_HAS_GDB" -eq 0 ]]; then
-  # copy the static bundle of gdb into image
-  cp /snapchange/gdb.static "$DIR/$GDB_STATIC"
-  # we use the static busybox instead of the system installed hexdump here.
-  # some system (notably ubuntu) do not ship with the hexdump utility in docker containers.
-  sed -i -e "1,15s!hexdump!$BUSYBOX_STATIC hexdump!g" "$DIR/$GDB_STATIC"
+
+
+log_success "done preparing root filesystem"
+
+echo "----------------------------------------"
+echo "!!! Sanity check the startup script !!!"
+cat "$RC_LOCAL"
+echo "----------------------------------------"
+echo "!!! Sanity check the harness root '/' directory !!!"
+ls -la "$DIR"
+echo "----------------------------------------"
+if [[ -n "$SNAPSHOT_ENTRYPOINT_CWD" ]]; then
+  echo "!!! Sanity check the harness working directory !!!"
+  ls -la "$DIR/$SNAPSHOT_ENTRYPOINT_CWD"
+  echo "----------------------------------------"
 fi
 
-
-echo "!!! Sanity check the root directory !!!"
-ls -la $DIR
-echo "!!! Sanity check the root directory !!!"
-
-# Sanity check the script was written properly
-echo "!!! Sanity check the startup script !!!"
-cat $RC_LOCAL
-echo "!!! Sanity check the startup script !!!"
-
-# Display the home directory as a sanity check
-echo "!!! Sanity check the home directory !!!"
-ls -la $DIR$HOMEDIR
-echo "!!! Sanity check the home directory !!!"
-
+log_msg "converting root fs to bootable $IMGTYPE"
 
 if [[ "$IMGTYPE" = "initramfs" ]]; then
     pushd "$DIR"
@@ -366,3 +368,5 @@ else
     echo "[ERROR] invalid IMGTYPE=$IMGTYPE"
     exit 1
 fi
+
+log_success "done"

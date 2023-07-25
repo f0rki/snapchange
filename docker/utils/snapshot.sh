@@ -32,13 +32,16 @@ fi
 if [[ -z "$KASAN" ]]; then
     KASAN=0
 fi
+
+source /snapchange/log.sh || { echo "Failed to source /snapchange/log.sh"; exit 1; }
+
 if [[ -z "$SNAPSHOT_ENTRYPOINT" ]]; then
-    echo "[ERROR] reuqire setting a SNAPSHOT_ENTRYPOINT"
+    log_error "require setting a SNAPSHOT_ENTRYPOINT"
     exit 1
 fi
   
 RELEASE="harness"
-D9P="/tmp/mnt.9p"  # directory for 9pfs
+D9P="$(mktemp -d "/tmp/mnt.9p.XXXXXXX")"  # directory for 9pfs
 
 set -eu -o pipefail
 
@@ -52,19 +55,19 @@ function start_vm {
   fi
 
   if ! command -v "$QEMU"; then
-      echo "[ERROR] No qemu found!"
-      exit 1
+    log_error "No qemu found! ('$QEMU')"
+    exit 1
   fi
   if [[ ! -e "$KERNEL" ]]; then
-      echo "[ERROR] no kernel found! ('$KERNEL')"
-      exit 1
+    log_error "kernel not found! ('$KERNEL')"
+    exit 1
   fi
 
   rm -rf "$D9P" || true
   mkdir -p "$D9P"
   D9P="$(realpath "$D9P")"
 
-  echo "[snapshot.sh] launching qemu"
+  log_msg "launching qemu"
 
   if [[ "$IMGTYPE" = "disk" ]]; then
      "$QEMU" \
@@ -93,8 +96,8 @@ function start_vm {
           -pidfile vm.pid \
           2>&1 | tee vm.log
   else
-      echo "[snapshot.sh][ERROR] invalid IMGTYPE=$IMGTYPE"
-      exit 1 
+    log_error "invalid IMGTYPE=$IMGTYPE - must be (disk|initramfs)"
+    exit 1 
   fi
 }
 
@@ -120,7 +123,7 @@ function extract_output {
 
   DIR="$D9P"
 
-  echo "[snapshot.sh] VM returned data:"
+  log_msg "VM returned data:"
   ls -al "$DIR"
 
   # Copy over the files written by `gdbsnapshot.py`
@@ -131,7 +134,7 @@ function extract_output {
   # Copy over the root symbols and, if found, move the user symbols to .symbols in order to
   # combine the symbols into one gdb.symbols
   if [ -f "$DIR/gdb.symbols.root" ]; then
-      echo "Combining root and user symbols"
+      log_msg "Combining root and user symbols"
       mv "$DIR/gdb.symbols.root" .
       mv gdb.symbols gdb.symbols.user 
       python3 combine_symbols.py
@@ -146,9 +149,8 @@ function extract_output {
   chown `id -u`:`id -g` gdb.vmmap
 
   # copy the saved working dir from the snapshot
-    cp -r "$DIR/cwd" "$OUTPUT/" || true
-
-    cp  "$DIR"/guestkernel* "$OUTPUT" || true
+  cp -r "$DIR/cwd" "$OUTPUT/" || true
+  cp  "$DIR"/guestkernel* "$OUTPUT" || true
 }
 
 
@@ -160,8 +162,8 @@ if [[ -n "$SNAPSHOT_KERNEL_IMG" ]]; then
   if [[ -n "$SNAPSHOT_KERNEL_ELF" ]]; then
     cp "$SNAPSHOT_KERNEL_ELF" "$OUTPUT/vmlinux"
   else
-    echo "[WARNING] couldn't find vmlinux corresponding to bootable kernel image '$SNAPSHOT_KERNEL_IMG'."
-    echo "[WARNING] please set the variable SNAPSHOT_KERNEL_ELF for kernel symbols!"
+    log_warning "couldn't find vmlinux corresponding to bootable kernel image '$SNAPSHOT_KERNEL_IMG'."
+    log_warning "please set the variable SNAPSHOT_KERNEL_ELF for kernel symbols!"
   fi
 else
   # Copy over the `vmlinux` into the output directory
@@ -183,35 +185,55 @@ while true; do
     # Login prompt signals that the /etc/rc.local script executed and can extract output
     # Status code of 0 means the login prompt was found in the vm.log
     if grep -e "\(linux login:\|snapshot done\|Attempted to kill init\)" vm.log 2>&1 >/dev/null || check_vm_halted; then
-        echo "[snapshot.sh] Finished booting.. extracting gdb output";
+        log_msg "Finished booting.. extracting gdb output";
         extract_output
 
-        echo "[snapshot.sh] Moving the snapshot data into $OUTPUT"
+        if ! [[ -e fuzzvm.physmem ]]; then
+          log_error "qemu did not produce a dump of the VM's memory/register state. Have you added a snapshot hypercall to your harness?"
+          log_msg "Make sure to set the environment variable LIBFUZZER=1 if you are using a libfuzzer binary."
+          log_msg "Otherwise, make sure that your program contains \`__asm(\"int3 ; vmcall\");\` to trigger the snapshot."
+          exit 1
+        fi
+
+        REQUIRED_FILES="fuzzvm.physmem fuzzvm.qemuregs"
+        if [[ "$SNAPSHOT_CHECK_FOR_GDB" -eq 1 ]]; then
+          REQUIRED_FILES="$REQUIRED_FILES gdb.symbols gdb.vmmap"
+        fi
+
+        for file in $REQUIRED_FILES; do
+          if ! [[ -e "$file" ]]; then
+            log_error "missing required file: $file"
+            exit 1
+          fi
+        done
+
+        log_msg "Moving the snapshot data into $OUTPUT"
         mv fuzzvm.* $OUTPUT
         mv gdb.* $OUTPUT
 
-        echo "[snapshot.sh] Found the following files"
+        log_msg "Found the following files"
         ls -la $OUTPUT
 
-        echo "[snapshot.sh] Found this SNAPSHOT output from the vm log"
+        log_msg "Found this SNAPSHOT output from the vm log"
         grep SNAPSHOT vm.log || true
 
-        echo "[snapshot.sh] Killing the VM"
+        log_msg "Killing the VM"
         kill_vm
 
-        echo "[snapshot.sh] (almost) done!"
+        log_success "(almost) done!"
         break
     fi
 
-    echo "[snapshot.sh] Waiting for VM..."
+    log_msg "Waiting for VM..."
     sleep 2
 done
 
 cp vm.log "$OUTPUT/"
 
+log_success "extracted snapshot - postprocessing now."
 
 if [[ "$LIBFUZZER" -eq 1 ]]; then 
-    echo "[snapshot.sh] patching physmem"
+    log_msg "patching physmem"
     BYTES="$(cat /tmp/libfuzzer.bytes.bak)"
     # Restore the original bytes at the LLVMFuzzerTestOneInput bytes
     r2 -w -q -c "/x cc0f01c1cdcdcdcdcdcdcdcdcdcdcdcd ; wx $BYTES @@ hit0*" "$OUTPUT/fuzzvm.physmem"
@@ -220,16 +242,16 @@ fi
 # Create the reset script for the snapshot
 cp ./reset_snapshot.sh $OUTPUT/reset.sh
 
-echo "[snapshot.sh] creating coverage breakpoints with ghidra"
+log_msg "creating coverage breakpoints with ghidra"
 # Create the coverage breakpoints and analysis
 BIN_NAME="$(basename "$SNAPSHOT_ENTRYPOINT")"
-
 # Get the base address of the example from the module list
 BASE="$(grep "$BIN_NAME" "$OUTPUT/gdb.modules" | cut -d' ' -f1)"
-
 # Use ghidra to find the coverage basic blocks
 python3 ./ghidra_basic_blocks.py --base-addr "$BASE" "$OUTPUT/$BIN_NAME.bin"
 
 
 # finally just chown to something more sensible
 chown -R "$SNAPSHOT_CHOWN_TO" "$OUTPUT" || true
+
+log_success "snapshot is ready now"

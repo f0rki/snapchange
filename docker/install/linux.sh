@@ -65,10 +65,10 @@ make defconfig
 
 yes "" | make -j "$(nproc)" bzImage
 
-mv vmlinux /snapchange/
+mv vmlinux /snapchange/vmlinux
 for bzimg in ./arch/x86/boot/bzImage ./arch/boot/x86_64/bzImage; do
     if [[ -e "$bzimg" ]]; then
-        mv "$bzimg" /snapchange/linux.bzImage
+        cp "$bzimg" /snapchange/linux.bzImage
         break
     fi
 done
@@ -81,7 +81,7 @@ yes "" | make -j "$(nproc)" bzImage
 mv vmlinux /snapchange/vmlinux.kasan
 for bzimg in ./arch/x86/boot/bzImage ./arch/boot/x86_64/bzImage; do
     if [[ -e "$bzimg" ]]; then
-        mv "$bzimg" /snapchange/linux.kasan.bzImage
+        cp "$bzimg" /snapchange/linux.kasan.bzImage
         break
     fi
 done
