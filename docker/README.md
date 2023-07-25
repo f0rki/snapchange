@@ -20,7 +20,7 @@ RUN cd /opt/ && make clean && make
 [...]
 ```
 
-Note that for best results, you should install gdb with python inside of your root filesystem.
+**You must install gdb with python inside of your root filesystem.**
 
 
 ### Step 2: Prepare the snapshoting container
@@ -29,6 +29,8 @@ Now that we have prepared a root filesystem, we can now build the snapshoting co
 First, you switch to the snapchange docker image and then copy the root filesystem from the previous step to the snapchange container.
 
 ```Dockerfile
+[...]
+
 FROM snapchange
 
 COPY --from=base / "$SNAPSHOT_INPUT"

@@ -42,6 +42,9 @@ fi
 if [[ -z "$SNAPSHOT_ENTRYPOINT_CWD" ]]; then
     SNAPSHOT_ENTRYPOINT_CWD=""
 fi
+if [[ -z "$SNAPCHANGE_DEV" ]]; then
+    SNAPCHANGE_DEV=0
+fi
 
 source /snapchange/log.sh || { echo "Failed to source /snapchange/log.sh"; exit 1; }
 
@@ -126,8 +129,19 @@ EOF
 DIR_HAS_GDB=0
 GDB_PATH="$(find "$DIR" -name gdb -type f | head -n 1)"
 if [[ -n "$GDB_PATH" ]]; then
+
+  GDB_INSIDE="/${GDB_PATH#*$DIR}"
   DIR_HAS_GDB=1
-  echo "export GDB=$GDB_PATH" >> "$RC_LOCAL"
+  cat >> "$RC_LOCAL" <<EOF
+export GDB=$GDB_INSIDE
+if ! test -e "\$GDB"; then
+    echo "[ERROR] cannot find gdb"
+    echo "[ERROR] cannot find gdb"
+    echo "[ERROR] cannot find gdb"
+    echo "[ERROR] cannot find gdb"
+    exit 1
+fi
+EOF
 else
   DIR_HAS_GDB=0
 
@@ -339,9 +353,11 @@ cp "$(which busybox)" "$DIR/$BUSYBOX_STATIC"
 
 log_success "done preparing root filesystem"
 
-echo "----------------------------------------"
-echo "!!! Sanity check the startup script !!!"
-cat "$RC_LOCAL"
+if [[ "$SNAPCHANGE_DEV" -eq 1 ]]; then
+    echo "----------------------------------------"
+    echo "!!! Sanity check the startup script !!!"
+    cat "$RC_LOCAL"
+fi
 echo "----------------------------------------"
 echo "!!! Sanity check the harness root '/' directory !!!"
 ls -la "$DIR"
