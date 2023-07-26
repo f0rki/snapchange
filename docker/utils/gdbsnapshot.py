@@ -125,10 +125,15 @@ def collect_process_memory_map():
         if '/usr/lib' in filepath or filepath.startswith('/lib'):
             if not os.path.exists("/usr/lib/debug/.build-id"):
                 print(".build_id not exist")
-                for (root, dirs, files) in os.walk("/usr/lib/debug"):
-                    if filename in files and "libc6-prof" not in root and "x86_64" in root:
-                        found = os.path.join(root, filename)
-                        break
+                if os.path.exists("/usr/lib/debug"):
+                    debug_path = "/usr/lib/debug/" + filepath + ".debug"
+                    print("trying path for .debug", debug_path)
+                    if os.path.exists(debug_path):
+                        found = debug_path
+                    for (root, dirs, files) in os.walk("/usr/lib/debug"):
+                        if filename in files and "libc6-prof" not in root and "x86_64" in root:
+                            found = os.path.join(root, filename)
+                            break
             else:
                 print("debug", filepath)
                 try:
