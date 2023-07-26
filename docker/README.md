@@ -20,7 +20,13 @@ RUN cd /opt/ && make clean && make
 [...]
 ```
 
-**You must install gdb with python inside of your root filesystem.**
+#### Harness Root Filesystem Requirements
+
+* **You must install gdb with python inside of your root filesystem.**
+    * We use gdb with a custom gdb script to obtain symbols of the snapshot'ed binary.
+* For best results, make sure that symbols are available for your target binary and all loaded library.
+    * Ubuntu works out-of-the-box as they ship a libc with symbols.
+    * For alpine we found that `apk --no-cache upgrade && apk add --no-cache --initramfs-diskless-boot python3 gdb build-base musl-dbg` works best.
 
 
 ### Step 2: Prepare the snapshoting container
