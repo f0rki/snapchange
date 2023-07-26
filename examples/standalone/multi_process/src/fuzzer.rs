@@ -7,7 +7,7 @@
 use anyhow::Result;
 
 use snapchange::addrs::{Cr3, VirtAddr};
-use snapchange::fuzzer::{Breakpoint, BreakpointLookup, BreakpointType, Fuzzer};
+use snapchange::fuzzer::Fuzzer;
 use snapchange::fuzzvm::FuzzVm;
 use snapchange::Execution;
 
@@ -33,14 +33,4 @@ impl Fuzzer for Example1Fuzzer {
 
         Ok(())
     }
-    //
-    // fn breakpoints(&self) -> Option<&[Breakpoint<Self>]> {
-    //     Some(&[])
-    // }
-    //
-    // fn reset_breakpoints(&self) -> Option<&[BreakpointLookup]> {
-    //     Some(&[
-    //         BreakpointLookup::SymbolOffset("example!exit", 0),
-    //     ])
-    // }
 }

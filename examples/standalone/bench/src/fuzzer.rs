@@ -7,7 +7,7 @@
 use anyhow::Result;
 
 use snapchange::addrs::{Cr3, VirtAddr};
-use snapchange::fuzzer::{Breakpoint, BreakpointLookup, BreakpointType, Fuzzer};
+use snapchange::fuzzer::Fuzzer;
 use snapchange::fuzzvm::FuzzVm;
 use snapchange::Execution;
 
@@ -16,14 +16,11 @@ use crate::constants;
 const CR3: Cr3 = Cr3(constants::CR3);
 
 #[derive(Default)]
-pub struct Example1Fuzzer {
-    // Fuzzer specific data could go in here
-}
+pub struct Example1Fuzzer {}
 
 impl Fuzzer for Example1Fuzzer {
     type Input = Vec<u8>;
     const START_ADDRESS: u64 = constants::RIP;
-    // const INPUT_ADDRESS: u64 = constants::INPUT;
     const MAX_INPUT_LENGTH: usize = 128;
     const MAX_MUTATIONS: u64 = 2;
 
