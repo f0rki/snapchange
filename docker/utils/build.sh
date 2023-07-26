@@ -50,6 +50,9 @@ source /snapchange/log.sh || { echo "Failed to source /snapchange/log.sh"; exit 
 
 RELEASE=harness
 
+SYMBOL_FILE_PATHS=""
+SYMBOL_FILE_PATHS="/usr/lib/debug/lib/ld-musl-x86_64.so.1.debug"
+
 if [[ -z "$SNAPSHOT_ENTRYPOINT" ]]; then
     log_error "require setting a SNAPSHOT_ENTRYPOINT"
     exit 1
@@ -235,11 +238,19 @@ chmod a+r "$DIR/$GDBPY"
 # Try to remove the old gdbcmds since we are writing a new one below
 rm $DIR/$GDBCMDS || true
 
+LOAD_SYMBOL_FILE=""
+for try_load in $SYMBOL_FILE_PATHS; do
+    if [[ -e "$DIR/$try_load" ]]; then
+        LOAD_SYMBOL_FILE="add-symbol-file $try_load \n$LOAD_SYMBOL_FILE"
+    fi
+done
+
 # Execute to the first int3, execute the gdbsnapshot, execute vmcall, then exit
 if [[ "$LIBFUZZER" -eq 1 ]]; then
     echo "LIBFUZZER SNAPSHOT DETECTED"
     echo "Taking a snapshot at LLVMFuzzerTestOneInput"
     cat > "$DIR/$GDBCMDS" <<EOF
+$(printf "$LOAD_SYMBOL_FILE")
 set pagination off
 # Ignore leak detection. 
 set environment ASAN_OPTIONS=detect_leaks=0
@@ -294,6 +305,7 @@ quit
 EOF
 else
     cat > "$DIR/$GDBCMDS" <<EOF
+$(printf "$LOAD_SYMBOL_FILE")
 set pagination off
 run
 source $GDBPY
