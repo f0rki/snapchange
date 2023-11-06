@@ -150,6 +150,8 @@ fn start_core<FUZZER: Fuzzer>(
     let mut input = starting_input.clone();
 
     let start_input_size = input_bytes.len();
+    let start_length = input.len();
+    let start_entropy = input.entropy_metric();
 
     // Initialize the performance counters for executing a VM
     let (orig_execution, mut orig_feedback) = fuzzvm.gather_feedback(
@@ -236,6 +238,20 @@ fn start_core<FUZZER: Fuzzer>(
                 "Iters {iters:6}/{max_iterations} | Exec/sec {:6.2}",
                 f64::from(iters) / start.elapsed().as_secs_f64()
             );
+            if let Some(length) = input.len() {
+                log::info!(
+                    "Minimized from {} -> {} bytes",
+                    start_length.unwrap(),
+                    length
+                );
+            }
+            if let Some(entropy) = input.entropy_metric() {
+                log::info!(
+                    "Minimized from {} -> {} entropy metric",
+                    start_entropy.unwrap(),
+                    entropy
+                );
+            }
 
             let curr_time = rdtsc() - timers_start;
 
