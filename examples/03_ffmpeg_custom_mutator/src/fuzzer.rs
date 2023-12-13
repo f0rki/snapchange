@@ -528,6 +528,8 @@ pub struct MovGenerator {
 }
 
 impl snapchange::FuzzInput for MovGenerator {
+    type MinState = snapchange::NullMinimizerState;
+
     fn from_bytes(bytes: &[u8]) -> Result<Self> {
         Ok(MovGenerator {
             bytes: bytes.to_vec(),
