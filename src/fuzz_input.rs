@@ -233,7 +233,7 @@ pub trait MinimizerState:
 /// }
 /// ```
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-struct NullMinimizerState;
+pub struct NullMinimizerState;
 
 impl MinimizerState for NullMinimizerState {
     fn is_stop_state(&self) -> bool {

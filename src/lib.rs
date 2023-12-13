@@ -1032,6 +1032,7 @@ pub mod prelude {
         rand,
         rng::Rng,
         snapchange_main, Execution, FuzzInput, InputWithMetadata,
+        fuzz_input::{NullMinimizerState, BytesMinimizeState, MinimizeControlFlow},
     };
 
     #[cfg(feature = "custom_feedback")]
