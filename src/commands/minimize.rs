@@ -504,19 +504,7 @@ pub(crate) fn run<FUZZER: Fuzzer>(
         None
     };
 
-    let mut filepaths = vec![];
-    if args.path.is_dir() {
-        for entry in std::fs::read_dir(&args.path)? {
-            if let Ok(entry) = entry {
-                let p = entry.path();
-                if !p.is_dir() {
-                    filepaths.push(p);
-                }
-            }
-        }
-    } else {
-        filepaths.push(args.path.clone());
-    }
+    let filepaths = crate::utils::get_files(&args.path, true)?;
 
     let mut minimized = 0_u32;
     for (infile, outfile) in filepaths
