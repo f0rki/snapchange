@@ -1,4 +1,4 @@
-//! Execute the `coverage` command
+//! Execute the `corpus-min` command
 
 use anyhow::{ensure, Context, Result};
 
@@ -18,9 +18,9 @@ use kvm_ioctls::VmFd;
 use crate::config::Config;
 use crate::fuzz_input::InputWithMetadata;
 use crate::fuzzer::Fuzzer;
-use crate::fuzzvm::{FuzzVm, FuzzVmExit};
+use crate::fuzzvm::{FuzzVm, FuzzVmExit, CoverageBreakpoints};
 use crate::memory::Memory;
-use crate::{cmdline, fuzzvm, unblock_sigalrm, SymbolList, THREAD_IDS};
+use crate::{cmdline, fuzzvm, unblock_sigalrm, SymbolList, THREAD_IDS, fuzzvm::ResetBreakpoints};
 use crate::{handle_vmexit, init_environment, KvmEnvironment, ProjectState};
 use crate::{Cr3, Execution, ResetBreakpointType, Symbol, VbCpu, VirtAddr};
 use crate::utils::get_files;
@@ -31,7 +31,7 @@ pub(crate) fn run<FUZZER: Fuzzer>(
     args: &cmdline::CorpusMin,
 ) -> Result<()> {
     ensure!(
-        project_state.coverage_breakpoints.is_some(),
+        project_state.coverage_basic_blocks.is_some(),
         "Must have covbps to gather minimize a corpus"
     );
 
@@ -48,7 +48,7 @@ pub(crate) fn run<FUZZER: Fuzzer>(
     } = init_environment(project_state)?;
 
     // Init the coverage breakpoints mapping to byte
-    let mut covbp_bytes = BTreeMap::new();
+    let mut covbp_bytes = crate::fuzzvm::CoverageBreakpoints::default();
     //
     let cr3 = Cr3(project_state.vbcpu.cr3);
     let mut total_coverage = Vec::new();
@@ -56,7 +56,7 @@ pub(crate) fn run<FUZZER: Fuzzer>(
     // Gather the total coverage for this project
     {
         let curr_clean_snapshot = clean_snapshot.read().unwrap();
-        for addr in project_state.coverage_breakpoints.as_ref().unwrap().keys().copied() {
+        for addr in project_state.coverage_basic_blocks.as_ref().unwrap().keys().copied() {
             if let Ok(orig_byte) = curr_clean_snapshot.read_byte(addr, cr3) {
                 covbp_bytes.insert(addr, orig_byte);
                 total_coverage.push(addr.0);
@@ -266,8 +266,8 @@ pub(crate) fn start_core<FUZZER: Fuzzer>(
     snapshot_fd: i32,
     clean_snapshot: Arc<RwLock<Memory>>,
     symbols: &Option<SymbolList>,
-    symbol_breakpoints: Option<BTreeMap<(VirtAddr, Cr3), ResetBreakpointType>>,
-    coverage_breakpoints: BTreeMap<VirtAddr, u8>,
+    symbol_breakpoints: Option<ResetBreakpoints>,
+    coverage_breakpoints: CoverageBreakpoints,
     vm_timeout: Duration,
     config: Config,
     paths: Arc<Vec<PathBuf>>,

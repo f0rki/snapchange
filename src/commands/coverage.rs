@@ -18,7 +18,7 @@ use crate::fuzz_input::InputWithMetadata;
 use crate::fuzzer::Fuzzer;
 use crate::fuzzvm::{FuzzVm, FuzzVmExit};
 use crate::memory::Memory;
-use crate::{cmdline, fuzzvm, unblock_sigalrm, SymbolList, THREAD_IDS};
+use crate::{cmdline, fuzzvm, unblock_sigalrm, SymbolList, THREAD_IDS, fuzzvm::ResetBreakpoints};
 use crate::{handle_vmexit, init_environment, KvmEnvironment, ProjectState};
 use crate::{Cr3, Execution, ResetBreakpointType, Symbol, VirtAddr};
 
@@ -28,7 +28,7 @@ pub(crate) fn run<FUZZER: Fuzzer>(
     args: &cmdline::Coverage,
 ) -> Result<()> {
     ensure!(
-        project_state.coverage_breakpoints.is_some(),
+        project_state.coverage_basic_blocks.is_some(),
         "Must have covbps to gather coverage"
     );
 
@@ -53,7 +53,7 @@ pub(crate) fn run<FUZZER: Fuzzer>(
     log::info!(
         "Init {} coverage",
         project_state
-            .coverage_breakpoints
+            .coverage_basic_blocks
             .as_ref()
             .context("coverage command requires coverage breakpoints!")?
             .len()
@@ -87,7 +87,7 @@ pub(crate) fn start_core<FUZZER: Fuzzer>(
     snapshot_fd: i32,
     clean_snapshot: Arc<RwLock<Memory>>,
     symbols: &Option<SymbolList>,
-    symbol_breakpoints: Option<BTreeMap<(VirtAddr, Cr3), ResetBreakpointType>>,
+    symbol_breakpoints: Option<ResetBreakpoints>,
     input_case: &PathBuf,
     vm_timeout: Duration,
     project_state: &ProjectState,
@@ -157,7 +157,7 @@ pub(crate) fn start_core<FUZZER: Fuzzer>(
         &input,
         vm_timeout,
         project_state
-            .coverage_breakpoints
+            .coverage_basic_blocks
             .as_ref()
             .unwrap()
             .keys()

@@ -85,6 +85,12 @@ pub enum BreakpointMemory {
     NotDirty,
 }
 
+
+/// Type that stores coverage breakpoints.
+pub type CoverageBreakpoints = crate::FxIndexMap<VirtAddr, u8>;
+pub type Breakpoints = crate::FxIndexMap<(VirtAddr, Cr3), usize>;
+pub type ResetBreakpoints = crate::FxIndexMap<(VirtAddr, Cr3), ResetBreakpointType>;
+
 /// Hook function protoype
 pub type HookFn<F> = fn(
     fuzzvm: &mut FuzzVm<F>,
@@ -485,7 +491,7 @@ pub struct FuzzVm<'a, FUZZER: Fuzzer> {
     /// Breakpoints currently set in the VM keyed with their original byte to potentially
     /// restore after it has been hit. The value in this map is the index into the
     /// various breakpoint arrays. This DOES NOT contain coverage breakpoints.
-    pub breakpoints: BTreeMap<(VirtAddr, Cr3), usize>,
+    pub breakpoints: Breakpoints,
 
     /// Original bytes for breakpoints in the VM indexed by the value in
     /// `self.breakpoints`.
@@ -528,7 +534,7 @@ pub struct FuzzVm<'a, FUZZER: Fuzzer> {
     /// Current set of single shot breakpoints set that, when hit, add the address to the
     /// coverage database.  This is an Option to enable a `.take()` to avoid a
     /// `&mut self ` collision when applying then breakpoints
-    pub coverage_breakpoints: Option<BTreeMap<VirtAddr, u8>>,
+    pub coverage_breakpoints: Option<CoverageBreakpoints>,
 
     /// Signifies if this VM will exit on syscalls. Handles whether
     /// `EferFlags::SYSTEM_CALL_EXTENSIONS` is enabled.
@@ -537,7 +543,7 @@ pub struct FuzzVm<'a, FUZZER: Fuzzer> {
     /// Breakpoints that, if hit, signify a crash or reset in the guest. This is an
     /// Option to enable a `.take()` to avoid a `&mut self ` collision when applying then
     /// breakpoints
-    pub reset_breakpoints: Option<BTreeMap<(VirtAddr, Cr3), ResetBreakpointType>>,
+    pub reset_breakpoints: Option<ResetBreakpoints>,
 
     /// List of symbols available in this VM
     pub symbols: &'a Option<SymbolList>,
@@ -655,8 +661,8 @@ impl<'a, FUZZER: Fuzzer> FuzzVm<'a, FUZZER> {
         cpuid: &CpuId,
         snapshot_fd: i32,
         clean_snapshot: Arc<RwLock<Memory>>,
-        coverage_breakpoints: Option<BTreeMap<VirtAddr, u8>>,
-        reset_breakpoints: Option<BTreeMap<(VirtAddr, Cr3), ResetBreakpointType>>,
+        coverage_breakpoints: Option<CoverageBreakpoints>,
+        reset_breakpoints: Option<ResetBreakpoints>,
         symbols: &'a Option<SymbolList>,
         config: Config,
         unwinders: StackUnwinders,
@@ -755,7 +761,7 @@ impl<'a, FUZZER: Fuzzer> FuzzVm<'a, FUZZER> {
             vm,
             vcpu,
             vbcpu: *virtualbox_cpu,
-            breakpoints: BTreeMap::new(),
+            breakpoints: Breakpoints::default(),
             breakpoint_original_bytes: Vec::new(),
             breakpoint_types: Vec::new(),
             breakpoint_hooks: Vec::new(),
@@ -882,7 +888,7 @@ impl<'a, FUZZER: Fuzzer> FuzzVm<'a, FUZZER> {
 
         // Add all of the reset/crash breakpoints given by the fuzzer
         if let Some(ref mut reset_bps) = fuzzvm.reset_breakpoints {
-            reset_bps.append(&mut new_reset_bps);
+            reset_bps.extend(&new_reset_bps);
         }
 
         // Remove all reset breakpoints from the coverage breakpoints if they exist
