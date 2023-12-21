@@ -25,7 +25,7 @@ use crate::coverage_analysis::CoverageAnalysis;
 use crate::enable_manual_dirty_log_protect;
 use crate::fuzz_input::{FuzzInput, InputWithMetadata};
 use crate::fuzzer::Fuzzer;
-use crate::fuzzvm::{FuzzVm, ResetBreakpoints, CoverageBreakpoints};
+use crate::fuzzvm::{CoverageBreakpoints, FuzzVm, ResetBreakpoints};
 use crate::rng::Rng;
 use crate::stats::PerfStatTimer;
 use crate::stats::{self, PerfMark};
@@ -447,7 +447,7 @@ pub(crate) fn run<FUZZER: Fuzzer + 'static>(
             let result = std::panic::catch_unwind(|| -> Result<()> {
                 start_core::<FUZZER>(
                     core_id,
-                    &vm,
+                    vm,
                     &project_state.vbcpu,
                     &cpuids,
                     physmem_file_fd,
@@ -673,7 +673,7 @@ pub(crate) fn run<FUZZER: Fuzzer + 'static>(
 /// Thread worker used to fuzz the given [`VbCpu`] state with the given physical memory.
 fn start_core<FUZZER: Fuzzer>(
     core_id: CoreId,
-    vm: &VmFd,
+    vm: VmFd,
     vbcpu: &VbCpu,
     cpuid: &CpuId,
     snapshot_fd: i32,
@@ -735,13 +735,13 @@ fn start_core<FUZZER: Fuzzer>(
         u64::try_from(core_id.id)?,
         &mut fuzzer,
         vm,
-        vbcpu,
+        *vbcpu,
         cpuid,
         snapshot_fd.as_raw_fd(),
         clean_snapshot,
         coverage_breakpoints,
         symbol_breakpoints,
-        symbols,
+        symbols.clone(),
         config.clone(),
         unwinders,
         #[cfg(feature = "redqueen")]

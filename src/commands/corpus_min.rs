@@ -18,12 +18,12 @@ use kvm_ioctls::VmFd;
 use crate::config::Config;
 use crate::fuzz_input::InputWithMetadata;
 use crate::fuzzer::Fuzzer;
-use crate::fuzzvm::{FuzzVm, FuzzVmExit, CoverageBreakpoints};
+use crate::fuzzvm::{CoverageBreakpoints, FuzzVm, FuzzVmExit};
 use crate::memory::Memory;
-use crate::{cmdline, fuzzvm, unblock_sigalrm, SymbolList, THREAD_IDS, fuzzvm::ResetBreakpoints};
+use crate::utils::get_files;
+use crate::{cmdline, fuzzvm, fuzzvm::ResetBreakpoints, unblock_sigalrm, SymbolList, THREAD_IDS};
 use crate::{handle_vmexit, init_environment, KvmEnvironment, ProjectState};
 use crate::{Cr3, Execution, ResetBreakpointType, Symbol, VbCpu, VirtAddr};
-use crate::utils::get_files;
 
 /// Execute the Coverage subcommand to gather coverage for a particular input
 pub(crate) fn run<FUZZER: Fuzzer>(
@@ -56,7 +56,13 @@ pub(crate) fn run<FUZZER: Fuzzer>(
     // Gather the total coverage for this project
     {
         let curr_clean_snapshot = clean_snapshot.read().unwrap();
-        for addr in project_state.coverage_basic_blocks.as_ref().unwrap().keys().copied() {
+        for addr in project_state
+            .coverage_basic_blocks
+            .as_ref()
+            .unwrap()
+            .keys()
+            .copied()
+        {
             if let Ok(orig_byte) = curr_clean_snapshot.read_byte(addr, cr3) {
                 covbp_bytes.insert(addr, orig_byte);
                 total_coverage.push(addr.0);
@@ -120,7 +126,7 @@ pub(crate) fn run<FUZZER: Fuzzer>(
             let t = std::thread::spawn(move || {
                 start_core::<FUZZER>(
                     CoreId { id: core_id },
-                    &vm,
+                    vm,
                     &vbcpu,
                     &cpuids,
                     physmem_file_fd,
@@ -247,7 +253,10 @@ pub(crate) fn run<FUZZER: Fuzzer>(
     let coverage_lcov = project_state.path.clone().join("coverage_min.lcov.info");
     if let Ok(debug_info) = crate::stats::DebugInfo::new(&project_state) {
         let mut lcov = debug_info.empty_lcov_info();
-        debug_info.update_lcov_addresses(&mut lcov, minimizer.addr_to_inputs.keys().cloned().map(|x| (x, 1_u32)));
+        debug_info.update_lcov_addresses(
+            &mut lcov,
+            minimizer.addr_to_inputs.keys().cloned().map(|x| (x, 1_u32)),
+        );
         lcov.write_to_file(coverage_lcov)?;
     } else {
         log::info!("failed to load debug info");
@@ -260,7 +269,7 @@ pub(crate) fn run<FUZZER: Fuzzer>(
 /// Thread worker used to gather coverage for a specific input
 pub(crate) fn start_core<FUZZER: Fuzzer>(
     core_id: CoreId,
-    vm: &VmFd,
+    vm: VmFd,
     vbcpu: &VbCpu,
     cpuid: &CpuId,
     snapshot_fd: i32,
@@ -302,13 +311,13 @@ pub(crate) fn start_core<FUZZER: Fuzzer>(
         u64::try_from(core_id.id)?,
         &mut fuzzer,
         vm,
-        vbcpu,
+        vbcpu.clone(),
         cpuid,
         snapshot_fd.as_raw_fd(),
         clean_snapshot,
         Some(coverage_breakpoints),
         symbol_breakpoints,
-        symbols,
+        symbols.clone(),
         config,
         crate::stack_unwinder::StackUnwinders::default(),
         #[cfg(feature = "redqueen")]

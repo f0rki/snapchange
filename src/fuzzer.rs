@@ -126,9 +126,9 @@ pub struct Breakpoint<FUZZER: Fuzzer> {
 }
 
 /// Generic fuzzer trait
-pub trait Fuzzer: Default + Sized {
+pub trait Fuzzer: Default + Sized + Send + Sync {
     /// The input type used by this fuzzer
-    type Input: FuzzInput + std::panic::RefUnwindSafe;
+    type Input: FuzzInput + std::panic::RefUnwindSafe + Send + Sync;
 
     /// The maximum length for an input used to truncate long inputs.
     const MAX_INPUT_LENGTH: usize;

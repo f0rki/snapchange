@@ -85,10 +85,11 @@ pub enum BreakpointMemory {
     NotDirty,
 }
 
-
 /// Type that stores coverage breakpoints.
 pub type CoverageBreakpoints = crate::FxIndexMap<VirtAddr, u8>;
+/// what
 pub type Breakpoints = crate::FxIndexMap<(VirtAddr, Cr3), usize>;
+/// what
 pub type ResetBreakpoints = crate::FxIndexMap<(VirtAddr, Cr3), ResetBreakpointType>;
 
 /// Hook function protoype
@@ -452,13 +453,13 @@ impl std::ops::AddAssign for VmRunPerf {
 
 /// Lightweight VM used for fuzzing a memory snapshot
 #[allow(clippy::struct_excessive_bools)]
-pub struct FuzzVm<'a, FUZZER: Fuzzer> {
+pub struct FuzzVm<FUZZER: Fuzzer> {
     /// The core id of the core running this VM
     #[allow(dead_code)]
     pub core_id: u64,
 
     /// Underlying VM from KVM
-    pub vm: &'a VmFd,
+    pub vm: VmFd,
 
     /// The CPU for this VM
     pub vcpu: VcpuFd,
@@ -546,7 +547,7 @@ pub struct FuzzVm<'a, FUZZER: Fuzzer> {
     pub reset_breakpoints: Option<ResetBreakpoints>,
 
     /// List of symbols available in this VM
-    pub symbols: &'a Option<SymbolList>,
+    pub symbols: Option<SymbolList>,
 
     /// Start time of the current fuzz case, used to determine if the VM should be timed
     /// out
@@ -644,7 +645,7 @@ unsafe fn copy_page(source: u64, dest: u64) {
     }
 }
 
-impl<'a, FUZZER: Fuzzer> FuzzVm<'a, FUZZER> {
+impl<FUZZER: Fuzzer> FuzzVm<FUZZER> {
     /// Create a [`FuzzVm`] using the given [`VmFd`] and snapshot registers from
     /// [`VbCpu`] with a memory backing at address `memory_backing`
     ///
@@ -656,14 +657,14 @@ impl<'a, FUZZER: Fuzzer> FuzzVm<'a, FUZZER> {
     pub fn create(
         core_id: u64,
         fuzzer: &mut FUZZER,
-        vm: &'a VmFd,
-        virtualbox_cpu: &VbCpu,
+        vm: VmFd,
+        virtual_cpu: VbCpu,
         cpuid: &CpuId,
         snapshot_fd: i32,
         clean_snapshot: Arc<RwLock<Memory>>,
         coverage_breakpoints: Option<CoverageBreakpoints>,
         reset_breakpoints: Option<ResetBreakpoints>,
-        symbols: &'a Option<SymbolList>,
+        symbols: Option<SymbolList>,
         config: Config,
         unwinders: StackUnwinders,
         #[cfg(feature = "redqueen")] redqueen_breakpoints: Option<
@@ -760,7 +761,7 @@ impl<'a, FUZZER: Fuzzer> FuzzVm<'a, FUZZER> {
             memory,
             vm,
             vcpu,
-            vbcpu: *virtualbox_cpu,
+            vbcpu: virtual_cpu,
             breakpoints: Breakpoints::default(),
             breakpoint_original_bytes: Vec::new(),
             breakpoint_types: Vec::new(),
@@ -802,7 +803,7 @@ impl<'a, FUZZER: Fuzzer> FuzzVm<'a, FUZZER> {
         // Pre-write all of the coverage breakpoints into the memory for the VM. The
         // "clean snapshot" memory also has the coverage breakpoints pre-written so
         // during reset, the breakpoints are already in place.
-        let cr3 = Cr3(virtualbox_cpu.cr3);
+        let cr3 = Cr3(virtual_cpu.cr3);
         if let Some(cov_bps) = fuzzvm.coverage_breakpoints.take() {
             for (addr, byte) in &cov_bps {
                 if let Ok(curr_byte) = fuzzvm.read::<u8>(*addr, cr3) {
@@ -2371,7 +2372,7 @@ impl<'a, FUZZER: Fuzzer> FuzzVm<'a, FUZZER> {
         let mut found = None;
 
         // Add the fuzzer specific symbols
-        if let Some(symbols) = self.symbols {
+        if let Some(symbols) = &self.symbols {
             for Symbol { address, symbol } in symbols {
                 // if symbol.contains(subsymbol) {
                 if symbol == subsymbol {
@@ -2415,7 +2416,7 @@ impl<'a, FUZZER: Fuzzer> FuzzVm<'a, FUZZER> {
         let mut possibles = Vec::new();
 
         // Add the fuzzer specific symbols
-        if let Some(symbols) = self.symbols {
+        if let Some(symbols) = &self.symbols {
             for Symbol { symbol, .. } in symbols {
                 if symbol.contains(subsymbol) {
                     possibles.push(symbol.clone());
@@ -2726,7 +2727,7 @@ impl<'a, FUZZER: Fuzzer> FuzzVm<'a, FUZZER> {
     /// * Fails to register guest memory
     fn init_guest_memory_backing(&mut self) -> Result<()> {
         self.memory_regions = crate::register_guest_memory(
-            self.vm,
+            &self.vm,
             self.memory.backing() as *mut libc::c_void,
             self.memory.size(),
         )?;

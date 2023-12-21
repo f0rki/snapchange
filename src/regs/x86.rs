@@ -233,7 +233,7 @@ macro_rules! impl_xmm {
     };
 }
 
-impl<FUZZER: Fuzzer> FuzzVm<'_, FUZZER> {
+impl<FUZZER: Fuzzer> FuzzVm<FUZZER> {
     //        reg,    <   8lo       > <   8hi   > <   16bit     > <   32bit     >   <   64bit    >
     impl_reg!(rax, al, set_al, ah, set_ah, ax, set_ax, eax, set_eax, rax, set_rax);
     impl_reg!(rbx, bl, set_bl, bh, set_bh, bx, set_bx, ebx, set_ebx, rbx, set_rbx);

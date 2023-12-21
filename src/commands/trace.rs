@@ -17,7 +17,9 @@ use kvm_ioctls::VmFd;
 
 use crate::fuzz_input::InputWithMetadata;
 use crate::fuzzer::{BreakpointType, Fuzzer};
-use crate::fuzzvm::{BreakpointHook, BreakpointMemory, FuzzVm, FuzzVmExit, ResetBreakpoints, CoverageBreakpoints};
+use crate::fuzzvm::{
+    BreakpointHook, BreakpointMemory, CoverageBreakpoints, FuzzVm, FuzzVmExit, ResetBreakpoints,
+};
 use crate::interrupts::IdtEntry;
 use crate::memory::Memory;
 use crate::{cmdline, fuzzvm, symbols, unblock_sigalrm, SymbolList, THREAD_IDS};
@@ -31,7 +33,7 @@ const NUMBER_OF_ITERATIONS: usize = 1;
 /// input
 fn start_core<FUZZER: Fuzzer>(
     core_id: CoreId,
-    vm: &VmFd,
+    vm: VmFd,
     vbcpu: &VbCpu,
     cpuid: &CpuId,
     snapshot_fd: i32,
@@ -83,13 +85,13 @@ fn start_core<FUZZER: Fuzzer>(
         u64::try_from(core_id.id)?,
         &mut fuzzer,
         vm,
-        vbcpu,
+        *vbcpu,
         cpuid,
         snapshot_fd.as_raw_fd(),
         clean_snapshot,
         coverage_breakpoints,
         symbol_breakpoints,
-        symbols,
+        symbols.clone(),
         config.clone(),
         unwinders.clone(),
         #[cfg(feature = "redqueen")]
@@ -749,7 +751,7 @@ pub(crate) fn run<FUZZER: Fuzzer>(
     // Start executing on this core
     start_core::<FUZZER>(
         core_id,
-        &vm,
+        vm,
         &project_state.vbcpu,
         &cpuids,
         physmem_file.as_raw_fd(),

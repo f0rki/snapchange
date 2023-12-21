@@ -31,7 +31,7 @@ use crate::{
     fuzz_input::{FuzzInput, InputWithMetadata},
     fuzzer::Fuzzer,
     fuzzvm,
-    fuzzvm::FuzzVm,
+    fuzzvm::{CoverageBreakpoints, FuzzVm, ResetBreakpoints},
     init_environment,
     stack_unwinder::StackUnwinders,
     unblock_sigalrm, Cr3, KvmEnvironment, Memory, ProjectState, ResetBreakpointType, Symbol,
@@ -45,7 +45,7 @@ pub(crate) fn run<FUZZER: Fuzzer>(
     args: &cmdline::RedqueenAnalysis,
 ) -> Result<()> {
     ensure!(
-        project_state.coverage_breakpoints.is_some(),
+        project_state.coverage_basic_blocks.is_some(),
         "Must have covbps to gather coverage"
     );
 
@@ -68,12 +68,12 @@ pub(crate) fn run<FUZZER: Fuzzer>(
         .ok_or_else(|| anyhow!("No valid cores"))?;
 
     // Init the fake coverage breakpoints for this command
-    let covbp_bytes = BTreeMap::new();
-
+    let covbp_bytes = CoverageBreakpoints::default();
+    ///BTreeMap::new();
     // Start executing on this core
     start_core::<FUZZER>(
         core_id,
-        &vm,
+        vm,
         &project_state.vbcpu,
         &cpuids,
         physmem_file.as_raw_fd(),
@@ -93,20 +93,23 @@ pub(crate) fn run<FUZZER: Fuzzer>(
 #[cfg(feature = "redqueen")]
 pub(crate) fn start_core<FUZZER: Fuzzer>(
     core_id: CoreId,
-    vm: &VmFd,
+    vm: VmFd,
     vbcpu: &VbCpu,
     cpuid: &CpuId,
     snapshot_fd: i32,
     clean_snapshot: Arc<RwLock<Memory>>,
     symbols: &Option<SymbolList>,
-    symbol_breakpoints: Option<BTreeMap<(VirtAddr, Cr3), ResetBreakpointType>>,
-    coverage_breakpoints: BTreeMap<VirtAddr, u8>,
+    symbol_breakpoints: Option<ResetBreakpoints>,
+    coverage_breakpoints: CoverageBreakpoints,
     input_case: &PathBuf,
     project_state: &ProjectState,
 ) -> Result<()> {
     // Store the thread ID of this thread used for passing the SIGALRM to this thread
 
-    use crate::SymbolList;
+    use crate::{
+        fuzzvm::{CoverageBreakpoints, ResetBreakpoints},
+        SymbolList,
+    };
     let thread_id = unsafe { libc::pthread_self() };
     *THREAD_IDS[core_id.id].lock().unwrap() = Some(thread_id);
 
@@ -150,13 +153,13 @@ pub(crate) fn start_core<FUZZER: Fuzzer>(
         u64::try_from(core_id.id)?,
         &mut fuzzer,
         vm,
-        vbcpu,
+        *vbcpu,
         cpuid,
         snapshot_fd.as_raw_fd(),
         clean_snapshot,
         Some(coverage_breakpoints),
         symbol_breakpoints,
-        symbols,
+        symbols.clone(),
         config.clone(),
         StackUnwinders::default(),
         redqueen_breakpoints.clone(),

@@ -48,6 +48,8 @@ crossterm = "0.22.1"
 tui-logger = "0.8.1"
 toml = "0.7.2"
 extended = "0.1.0"
+crossbeam = { version = "0.8.2", features = ["nightly", "crossbeam-deque"] }
+rayon = "1.8.0"
 
 [profile.release]
 debug = true

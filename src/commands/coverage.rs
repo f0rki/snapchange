@@ -18,7 +18,7 @@ use crate::fuzz_input::InputWithMetadata;
 use crate::fuzzer::Fuzzer;
 use crate::fuzzvm::{FuzzVm, FuzzVmExit};
 use crate::memory::Memory;
-use crate::{cmdline, fuzzvm, unblock_sigalrm, SymbolList, THREAD_IDS, fuzzvm::ResetBreakpoints};
+use crate::{cmdline, fuzzvm, fuzzvm::ResetBreakpoints, unblock_sigalrm, SymbolList, THREAD_IDS};
 use crate::{handle_vmexit, init_environment, KvmEnvironment, ProjectState};
 use crate::{Cr3, Execution, ResetBreakpointType, Symbol, VirtAddr};
 
@@ -62,7 +62,7 @@ pub(crate) fn run<FUZZER: Fuzzer>(
     // Start executing on this core
     start_core::<FUZZER>(
         core_id,
-        &vm,
+        vm,
         &cpuids,
         physmem_file.as_raw_fd(),
         clean_snapshot,
@@ -82,7 +82,7 @@ pub(crate) fn run<FUZZER: Fuzzer>(
 /// Thread worker used to gather coverage for a specific input
 pub(crate) fn start_core<FUZZER: Fuzzer>(
     core_id: CoreId,
-    vm: &VmFd,
+    vm: VmFd,
     cpuid: &CpuId,
     snapshot_fd: i32,
     clean_snapshot: Arc<RwLock<Memory>>,
@@ -129,13 +129,13 @@ pub(crate) fn start_core<FUZZER: Fuzzer>(
         u64::try_from(core_id.id)?,
         &mut fuzzer,
         vm,
-        &vbcpu,
+        vbcpu.clone(),
         cpuid,
         snapshot_fd.as_raw_fd(),
         clean_snapshot,
         None,
         symbol_breakpoints,
-        symbols,
+        symbols.clone(),
         config.clone(),
         crate::stack_unwinder::StackUnwinders::default(),
         #[cfg(feature = "redqueen")]
@@ -218,11 +218,9 @@ pub(crate) fn start_core<FUZZER: Fuzzer>(
             &feedback,
             symbols_file,
         )?;
-
     } else {
         log::warn!("failed to load debug info");
     }
-
 
     if display_context {
         fuzzvm.print_context()?;

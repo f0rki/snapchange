@@ -142,7 +142,7 @@ ioctl_iow_nr!(KVM_GET_DIRTY_LOG, KVMIO, 0x42, kvm_dirty_log);
 ioctl_iowr_nr!(KVM_CLEAR_DIRTY_LOG, KVMIO, 0xc0, kvm_clear_dirty_log);
 ioctl_io_nr!(KVM_CHECK_EXTENSION, KVMIO, 0x03);
 
-impl<'a, FUZZER: Fuzzer> FuzzVm<'a, FUZZER> {
+impl<FUZZER: Fuzzer> FuzzVm<FUZZER> {
     /// Gets the dirty logs for each slot in `self.dirty_bitmaps`
     ///
     /// # Errors
@@ -163,7 +163,7 @@ impl<'a, FUZZER: Fuzzer> FuzzVm<'a, FUZZER> {
 
             // Safe because we know that our file is a VM fd, and we know that the amount
             // of memory we allocated for the bitmap is at least one bit per page.
-            let ret = unsafe { ioctl_with_ref(self.vm, KVM_GET_DIRTY_LOG(), &dirty_log) };
+            let ret = unsafe { ioctl_with_ref(&self.vm, KVM_GET_DIRTY_LOG(), &dirty_log) };
 
             // Check if ioctl failed
             if ret != 0 {
@@ -201,7 +201,7 @@ impl<'a, FUZZER: Fuzzer> FuzzVm<'a, FUZZER> {
 
             // Safe because we know that our file is a VM fd, and we know that the amount
             // of memory we allocated for the bitmap is at least one bit per page.
-            let ret = unsafe { ioctl_with_ref(self.vm, KVM_CLEAR_DIRTY_LOG(), &clear_log) };
+            let ret = unsafe { ioctl_with_ref(&self.vm, KVM_CLEAR_DIRTY_LOG(), &clear_log) };
 
             // Check if ioctl failed
             if ret != 0 {

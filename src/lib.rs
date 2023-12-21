@@ -191,6 +191,8 @@ mod filesystem;
 pub mod fuzz_input;
 pub mod mutators;
 
+pub mod parexec;
+
 mod stats_tui;
 pub mod utils;
 pub use utils::write_crash_input;
@@ -1027,12 +1029,12 @@ pub mod prelude {
         addrs::{Cr3, VirtAddr},
         anyhow,
         anyhow::Result,
+        fuzz_input::{BytesMinimizeState, MinimizeControlFlow, NullMinimizerState},
         fuzzer::{AddressLookup, Breakpoint, BreakpointType, Fuzzer},
         fuzzvm::FuzzVm,
         rand,
         rng::Rng,
         snapchange_main, Execution, FuzzInput, InputWithMetadata,
-        fuzz_input::{NullMinimizerState, BytesMinimizeState, MinimizeControlFlow},
     };
 
     #[cfg(feature = "custom_feedback")]

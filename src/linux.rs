@@ -150,7 +150,7 @@ pub struct KasanReport {
 }
 
 #[allow(dead_code)]
-impl<'a, FUZZER: Fuzzer> FuzzVm<'a, FUZZER> {
+impl<FUZZER: Fuzzer> FuzzVm<FUZZER> {
     /// Get the signal during the `.force_sig_fault` call
     ///  
     /// # Errors

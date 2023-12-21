@@ -19,7 +19,7 @@ use crate::fuzzer::Fuzzer;
 use crate::fuzzvm::{FuzzVm, FuzzVmExit};
 use crate::memory::Memory;
 use crate::stack_unwinder::StackUnwinders;
-use crate::{cmdline, fuzzvm, unblock_sigalrm, THREAD_IDS, SymbolList};
+use crate::{cmdline, fuzzvm, unblock_sigalrm, SymbolList, THREAD_IDS};
 use crate::{handle_vmexit, init_environment, KvmEnvironment, ProjectState};
 use crate::{Cr3, Execution, ResetBreakpointType, Symbol, VbCpu, VirtAddr};
 
@@ -28,7 +28,7 @@ use crate::{Cr3, Execution, ResetBreakpointType, Symbol, VbCpu, VirtAddr};
 #[allow(clippy::needless_pass_by_value)]
 fn start_core<FUZZER: Fuzzer>(
     core_id: CoreId,
-    vm: &VmFd,
+    vm: VmFd,
     vbcpu: &VbCpu,
     cpuid: &CpuId,
     snapshot_fd: i32,
@@ -70,13 +70,13 @@ fn start_core<FUZZER: Fuzzer>(
         u64::try_from(core_id.id)?,
         &mut fuzzer,
         vm,
-        vbcpu,
+        *vbcpu,
         cpuid,
         snapshot_fd.as_raw_fd(),
         clean_snapshot,
         None,
         symbol_breakpoints,
-        symbols,
+        symbols.clone(),
         config,
         StackUnwinders::default(),
         #[cfg(feature = "redqueen")]
@@ -263,7 +263,7 @@ pub(crate) fn run<FUZZER: Fuzzer>(
         let t = std::thread::spawn(move || {
             start_core::<FUZZER>(
                 core_id,
-                &vm,
+                vm,
                 &vbcpu,
                 &cpuids,
                 physmem_file_fd,

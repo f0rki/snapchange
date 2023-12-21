@@ -20,12 +20,12 @@ use crate::cmp_analysis::{Conditional, Operand, RedqueenArguments, Size};
 use crate::config::Config;
 use crate::feedback::FeedbackTracker;
 use crate::fuzzer::ResetBreakpointType;
+use crate::fuzzvm::ResetBreakpoints;
 use crate::stack_unwinder::StackUnwinders;
 use crate::stats;
 use crate::symbols::{Symbol, LINUX_KERNEL_SYMBOLS, LINUX_USERLAND_SYMBOLS};
 use crate::vbcpu::{VbCpu, VmSelector, X86FxState, X86XSaveArea, X86XSaveHeader, X86XsaveYmmHi};
 use crate::SymbolList;
-use crate::fuzzvm::ResetBreakpoints;
 
 /// Custom errors [`FuzzVm`](crate::fuzzvm::FuzzVm) can throw
 #[derive(Error, Debug)]
@@ -77,7 +77,7 @@ pub enum Error {
 pub type BasicBlockMap = crate::FxIndexMap<VirtAddr, usize>;
 
 /// The files associated with the snapshot state
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ProjectState {
     /// The path to this project
     pub(crate) path: PathBuf,
