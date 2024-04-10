@@ -142,8 +142,7 @@ impl FuzzInput for TextInput {
                 }
             }
 
-            // Choose which mutators to use for this mutation. Expensive mutators are
-            // harder to hit since they are a bit more costly
+            // Choose which mutators to use for this mutation.
             let curr_mutators = if !Self::expensive_mutators().is_empty()
                 && (rng.next_u64() % max_mutations * 5 == 0)
             {
@@ -185,29 +184,36 @@ impl FuzzInput for TextInput {
             // dictionary-based mutations
             mutators::text::splice_from_dictionary,
             mutators::text::insert_from_dictionary,
-            // advanced text-focused insertion operators
-            mutators::text::insert_from_dictionary_separated_by::<'\n'>,
-            mutators::text::insert_from_dictionary_separated_by::<'\t'>,
-            mutators::text::insert_from_dictionary_separated_by::<' '>,
-            mutators::text::insert_from_dictionary_separated_by::<';'>,
+            // splice sublices from corpus
             // text-focused mutation operations:
             // line-focused
             mutators::text::dup_between_separator::<'\n'>,
             mutators::text::delete_between_separator::<'\n'>,
-            // word-focused
+            mutators::text::insert_from_dictionary_after::<'\n'>,
+            mutators::text::splice_from_corpus_separated_by::<'\n'>,
+            // word-focused with ' ' and '\t'
             mutators::text::dup_between_separator::<' '>,
-            mutators::text::delete_between_separator::<' '>,
             mutators::text::dup_between_separator::<'\t'>,
+            mutators::text::delete_between_separator::<' '>,
             mutators::text::delete_between_separator::<'\t'>,
+            mutators::text::splice_from_corpus_separated_by::<' '>,
+            mutators::text::splice_from_corpus_separated_by::<'\t'>,
+            mutators::text::insert_from_dictionary_after::<' '>,
+            mutators::text::insert_from_dictionary_after::<'\t'>,
             // interesting for programming languages:
             mutators::text::dup_between_separator::<';'>,
             mutators::text::delete_between_separator::<';'>,
-            mutators::text::dup_between_separator::<','>,
-            mutators::text::delete_between_separator::<','>,
+            mutators::text::splice_from_corpus_separated_by::<';'>,
+            mutators::text::insert_from_dictionary_after::<';'>,
+            mutators::text::dup_between_separator::<';'>,
+            mutators::text::delete_between_separator::<';'>,
+            mutators::text::splice_from_corpus_separated_by::<','>,
+            mutators::text::insert_from_dictionary_after::<','>,
         ]
     }
 
-    /// Current expensive mutators available for mutation (typically those which allocate)
+    /// mutators that are called less often. For `TextInput` these are not necessarily more
+    /// expensive, but not as likely to trigger progress.
     fn expensive_mutators() -> &'static [Self::MutatorFunc] {
         &[
             // potentially longer random strings

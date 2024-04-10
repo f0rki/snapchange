@@ -97,7 +97,7 @@
 #![feature(trait_alias)]
 #![feature(thread_id_value)]
 #![feature(map_try_insert)]
-#![feature(stdsimd)]
+// #![feature(stdsimd)]
 #![feature(avx512_target_feature)]
 #![feature(core_intrinsics)]
 #![feature(associated_type_defaults)]

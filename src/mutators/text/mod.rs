@@ -79,8 +79,32 @@ pub fn insert_from_corpus_separated_by<const C: char>(
     Some(format!("InsertFromCorpus_at_{index}"))
 }
 
+/// Splice from another corpus entry into the current input at a given separator.
+pub fn splice_from_corpus_separated_by<const C: char>(
+    input: &mut TextInput,
+    corpus: &[Arc<InputWithMetadata<TextInput>>],
+    rng: &mut Rng,
+    _dictionary: &Option<Vec<Vec<u8>>>,
+) -> Option<String> {
+    if corpus.len() < 2 {
+        return None;
+    }
+    // select another corpus item != the current one - we require that there are at least two corpus
+    // entries so we know this doesn't loop endlessly.
+    let other = loop {
+        let other = corpus.choose(rng).unwrap();
+        if other.data().as_ptr() != input.data().as_ptr() {
+            break other;
+        }
+    };
+
+    let (input_index, _other_index) = helpers::splice_separated(input.data_mut(), C, &other.data(), rng)?;
+
+    Some(format!("SpliceFromCorpus_at_{input_index}"))
+}
+
 /// Insert from dictionary at a given separator.
-pub fn insert_from_dictionary_separated_by<const C: char>(
+pub fn insert_from_dictionary_after<const C: char>(
     input: &mut TextInput,
     _corpus: &[Arc<InputWithMetadata<TextInput>>],
     rng: &mut Rng,

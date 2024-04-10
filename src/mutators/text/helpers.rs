@@ -231,6 +231,7 @@ where
     let sep: u8 = sep.try_into().unwrap();
     input.reserve(other.len() + 2);
 
+    // if the target input is empty, just insert everything and add a separator before and after.
     if input.is_empty() {
         input.push(sep);
         input.extend_from_slice(other);
@@ -258,6 +259,88 @@ where
         input.extend_from_slice(other);
         input.push(sep);
         Some(l)
+    }
+}
+
+/// Splice data between a separator.
+///
+/// ```rust,ignore
+/// let mut v = b"asdf; asdf".to_vec();
+/// splice_separated(&mut v, ';', "XXXX; AAAA", rng);
+/// assert_eq!(v, b"XXXX; asdf");
+/// ```
+pub fn splice_separated<T>(
+    input: &mut Vec<u8>,
+    sep: T,
+    other: &[u8],
+    rng: &mut impl rand::Rng,
+) -> Option<(usize, usize)>
+where
+    T: TryInto<u8>,
+    <T as TryInto<u8>>::Error: std::fmt::Debug,
+{
+    let sep: u8 = sep.try_into().unwrap();
+
+    // find separator in the other slice
+    let other_seps: Vec<usize> = other
+        .iter()
+        .copied()
+        .enumerate()
+        .filter_map(|(i, c)| if c == sep { Some(i) } else { None })
+        .collect();
+    let input_seps: Vec<usize> = input
+        .iter()
+        .copied()
+        .enumerate()
+        .filter_map(|(i, c)| if c == sep { Some(i) } else { None })
+        .collect();
+
+    // now attempt choose a random sublice that is enclosed with the separator
+    let (other_data, other_start) = if other_seps.is_empty() {
+        // if there is no separator splice the whole other
+        (other, 0)
+    } else {
+        // choose a random subslice separated by a separator
+        let sep_idx = rng.gen_range(0..other_seps.len());
+        let (from, to) = if sep_idx > 0 {
+            if rng.gen_bool(0.7) {
+                // with higher prob choose a "single line"
+                (other_seps[sep_idx - 1] + 1, other_seps[sep_idx])
+            } else {
+                // with lower prob choose a subslice spanning "multiple lines"
+                let start = other_seps[..sep_idx].choose(rng).unwrap().clone();
+                (start, other_seps[sep_idx])
+            }
+        } else {
+            (0, other_seps[sep_idx])
+        };
+        (&other[from..to], from)
+    };
+
+    if input_seps.is_empty() {
+        input.clear();
+        input.extend_from_slice(other_data);
+        Some((0, other_start))
+    } else {
+        // choose a random subslice separated by a separator
+        let sep_idx = rng.gen_range(0..input_seps.len());
+        let (from, to) = if sep_idx > 0 {
+            if rng.gen_bool(0.8) {
+                // with higher prob choose a "single line"
+                (input_seps[sep_idx - 1] + 1, input_seps[sep_idx])
+            } else {
+                // with lower prob choose a subslice spanning "multiple lines"
+                let start = input_seps[..sep_idx].choose(rng).unwrap().clone();
+                (start, input_seps[sep_idx])
+            }
+        } else {
+            (0, input_seps[sep_idx])
+        };
+
+        // splice
+        utils::vec::splice_into(input, from..to, other_data);
+
+        Some((from, other_start))
     }
 }
 
@@ -363,6 +446,12 @@ where
 
 /// Delete data between two separators
 /// Returns range of deleted data.
+///
+/// ```rust,ignore
+/// let mut v = b"asdf\nbsdf\n".to_vec();
+/// delete_between_separator(&mut v, b'\n', rng);
+/// assert!(v == b"asdf\n" || v == b"bsdf\n");
+/// ```
 #[inline]
 pub fn delete_between_separator<T>(
     input: &mut Vec<u8>,
@@ -400,7 +489,13 @@ where
     Some((start_offset, end_offset))
 }
 
-/// Duplicate data between two separators
+/// Duplicate data between two separators.
+///
+/// ```rust,ignore
+/// let mut v = b"asdf\nbsdf\n".to_vec();
+/// dup_between_separator(&mut v, b'\n', rng);
+/// assert!(v == b"asdf\nasdf\nbsdf\n" || v == b"asdf\nbsdf\nbsdf\n");
+/// ```
 #[inline]
 pub fn dup_between_separator<T>(
     input: &mut Vec<u8>,

@@ -46,7 +46,7 @@ static void party(js_State *J) {
     if (js_isnumber(J, i)) {
       int val = (int)js_tonumber(J, i);
       party_counter += val;
-      if (party_counter > 1000) {
+      if (party_counter > 43) {
         party_counter = 0;
       }
       if (party_counter > 42) {
