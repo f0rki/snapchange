@@ -24,8 +24,7 @@ lazy_static! {
             .collect()
     };
     pub static ref INTEGER_REGEX: Regex = Regex::new(r"[^\d][\d]+[^\d]").unwrap();
-    pub static ref HEX_INTEGER_REGEX: Regex =
-        Regex::new(r"[^\da-fA-F][\da-fA-F][^\da-fA-F]").unwrap();
+    pub static ref HEX_INTEGER_REGEX: Regex = Regex::new(r"[^\d]0x[\da-fA-F]+[^\da-fA-F]").unwrap();
 }
 
 #[derive(Hash, PartialEq, Debug, Copy, Clone)]
@@ -84,6 +83,15 @@ pub fn random_ascii_string(rng: &mut impl rand::Rng, max_length: usize) -> Strin
 }
 
 /// Identify an integer in the text input and replace it with the given replacement bytes.
+///
+/// ```rust
+/// # let mut rngi = snapchange::utils::MockRng::default();
+/// # let mut rng = &mut rngi;
+/// # use snapchange::mutators::text::helpers::replace_integer_with;
+/// let mut buf = b"strncpy(d, s, 10);".to_vec();
+/// replace_integer_with(&mut buf, b"42", rng).unwrap();
+/// assert_eq!(buf, b"strncpy(d, s, 42);");
+/// ```
 pub fn replace_integer_with(
     data: &mut Vec<u8>,
     repl: &[u8],
@@ -92,7 +100,7 @@ pub fn replace_integer_with(
     if let Some(irange) = INTEGER_REGEX
         .find_iter(&data)
         .choose(rng)
-        .map(|m| (m.start() + 1)..m.end())
+        .map(|m| (m.start() + 1)..(m.end() - 1))
     {
         utils::vec::splice_into(data, irange.clone(), repl);
         Some(irange)
@@ -102,6 +110,15 @@ pub fn replace_integer_with(
 }
 
 /// Identify a hex integer in the text input and replace it with the given replacement bytes.
+///
+/// ```rust
+/// # let mut rngi = snapchange::utils::MockRng::new(&[1, 1, 1]);
+/// # let mut rng = &mut rngi;
+/// # use snapchange::mutators::text::helpers::replace_hex_integer_with;
+/// let mut buf = b"strncpy(d, s, 0x10);".to_vec();
+/// replace_hex_integer_with(&mut buf, b"111111", rng).unwrap();
+/// assert_eq!(String::from_utf8_lossy(&buf), "strncpy(d, s, 0x111111);");
+/// ```
 pub fn replace_hex_integer_with(
     data: &mut Vec<u8>,
     repl: &[u8],
@@ -110,7 +127,7 @@ pub fn replace_hex_integer_with(
     if let Some(irange) = HEX_INTEGER_REGEX
         .find_iter(&data)
         .choose(rng)
-        .map(|m| m.range())
+        .map(|m| (m.start() + 3)..(m.end() - 1))
     {
         utils::vec::splice_into(data, irange.clone(), repl);
         Some(irange)
@@ -120,6 +137,15 @@ pub fn replace_hex_integer_with(
 }
 
 /// Identify an integer and replace it with a random u64.
+///
+/// ```rust
+/// # let mut rngi = snapchange::utils::MockRng::new(&[1337]);
+/// # let mut rng = &mut rngi;
+/// # use snapchange::mutators::text::helpers::replace_integer_with_rand;
+/// let mut buf = b"strncpy(d, s, 10);".to_vec();
+/// replace_integer_with_rand(&mut buf, rng);
+/// assert_eq!(String::from_utf8_lossy(&buf), "strncpy(d, s, 1337);");
+/// ```
 pub fn replace_integer_with_rand(
     data: &mut Vec<u8>,
     rng: &mut impl rand::Rng,
@@ -195,16 +221,22 @@ pub fn insert_random_string<const N: usize>(
 }
 
 /// Insert up to N random ascii chars at a random offset.
+///
+/// ```rust
+/// # let mut rngi = snapchange::utils::MockRng::new(&[0, 0, 10, 10, (1 << (32 - 6))]);
+/// # let mut rng = &mut rngi;
+/// # use snapchange::mutators::text::helpers::*;
+/// let mut v = b"1234".to_vec();
+/// insert_repeated_chars::<4>(&mut v, rng).unwrap();
+/// assert_eq!(String::from_utf8_lossy(&v), "B1234");
+/// ```
 pub fn insert_repeated_chars<const N: usize>(
     input: &mut Vec<u8>,
     rng: &mut impl rand::Rng,
 ) -> Option<(usize, u8, usize)> {
-    if input.is_empty() {
-        return None;
-    }
-
-    let count = rng.gen_range(0..N);
+    debug_assert!(N > 1);
     let c: u8 = Alphanumeric.sample(rng);
+    let count = rng.gen_range(1..=N);
     let data = [c; N];
     let idx = rng.gen_range(0..=input.len());
     utils::vec::fast_insert_at(input, idx, &data[..count]);
@@ -213,9 +245,12 @@ pub fn insert_repeated_chars<const N: usize>(
 
 /// Insert data after a separator and add another separator.
 ///
-/// ```rust,ignore
-/// let mut v = b"asdf; asdf";
-/// insert_separated(v, ';', "XXXX", rng);
+/// ```rust
+/// # let mut rngi = snapchange::utils::MockRng::new(&[]);
+/// # let mut rng = &mut rngi;
+/// # use snapchange::mutators::text::helpers::*;
+/// let mut v = b"asdf; asdf".to_vec();
+/// insert_separated(&mut v, ';', b"XXXX", rng).unwrap();
 /// assert_eq!(v, b"asdf;XXXX; asdf");
 /// ```
 pub fn insert_separated<T>(
@@ -264,9 +299,12 @@ where
 
 /// Splice data between a separator.
 ///
-/// ```rust,ignore
+/// ```rust
+/// # let mut rngi = snapchange::utils::MockRng::new(&[]);
+/// # let mut rng = &mut rngi;
+/// # use snapchange::mutators::text::helpers::*;
 /// let mut v = b"asdf; asdf".to_vec();
-/// splice_separated(&mut v, ';', "XXXX; AAAA", rng);
+/// splice_separated(&mut v, ';', b"XXXX; AAAA", rng);
 /// assert_eq!(v, b"XXXX; asdf");
 /// ```
 pub fn splice_separated<T>(
@@ -346,14 +384,19 @@ where
 
 /// Insert data after a separator.
 ///
-/// ```rust,ignore
-/// let mut v = b"asdf; asdf";
-/// insert_separated(v, ';', "XXXX", rng);
-/// assert_eq!(v, b"asdf;XXXX asdf");
-///
-/// let mut v = b"var asdf = \"asdf\";";
-/// insert_at_separator(v, '"', "XXXX", rng);
-/// assert!(&v == b"var asdf = \"XXXXasdf\";" || &v == b"var asdf = \"asdf\"XXXX;");
+/// ```rust
+/// # use snapchange::mutators::text::helpers::*;
+/// # let mut rngi = snapchange::utils::MockRng::new(&[0]);
+/// # let mut rng = &mut rngi;
+/// # // let mut v = b"var asdf = \"asdf\";".to_vec();
+/// # // insert_after_separator(&mut v, '"', b"XXXX", rng);
+/// # // assert_eq!(String::from_utf8_lossy(&v), "var asdf = \"XXXXasdf\";", "first \" was chosen by rng");
+/// # // or
+/// # let mut rngi = snapchange::utils::MockRng::new(&[1]);
+/// # let mut rng = &mut rngi;
+/// let mut v = b"var asdf = \"asdf\";".to_vec();
+/// insert_after_separator(&mut v, '"', b"XXXX", rng);
+/// assert_eq!(String::from_utf8_lossy(&v), "var asdf = \"asdf\"XXXX;", "second \" was chosen by rng");
 /// ```
 pub fn insert_after_separator<T>(
     input: &mut Vec<u8>,
@@ -396,14 +439,28 @@ where
 
 /// Insert data before a separator.
 ///
-/// ```rust,ignore
-/// let mut v = b"asdf; asdf";
-/// insert_separated(v, ';', "XXXX", rng);
-/// assert_eq!(v, b"asdfXXXX; asdf");
+/// ```rust
+/// # use snapchange::mutators::text::helpers::*;
+/// # let mut rngi = snapchange::utils::MockRng::new(&[0xffff, 0xffff, 0xffff, 0xff]);
+/// # let mut rng = &mut rngi;
+/// # // TODO: fix this part of the doctest?
+/// # let mut v = b"var asdf = \"asdf\";".to_vec();
+/// # insert_before_separator(&mut v, '"', b"XXXX", rng).unwrap();
+/// # // assert_eq!(String::from_utf8_lossy(&v), "var asdf = XXXX\"asdf\";", "first \" chosen");
+/// // or
+/// # let mut rngi = snapchange::utils::MockRng::new(&[0]);
+/// # let mut rng = &mut rngi;
+/// let mut v = b"var asdf = \"asdf\";".to_vec();
+/// insert_before_separator(&mut v, '"', b"XXXX", rng).unwrap();
+/// assert_eq!(String::from_utf8_lossy(&v), "var asdf = \"asdfXXXX\";", "second \" chosen");
 ///
-/// let mut v = b"var asdf = \"asdf\";";
-/// insert_at_separator(v, '"', "XXXX", rng);
-/// assert!(&v == b"var asdf = XXXX\"asdf\";" || &v == b"var asdf = \"asdfXXXX\";");
+///
+/// # let mut rngi = snapchange::utils::MockRng::new(&[0]);
+/// # let mut rng = &mut rngi;
+/// // in case the target buf is empty, we insert.
+/// let mut v = b"".to_vec();
+/// insert_before_separator(&mut v, '"', b"XXXX", rng).unwrap();
+/// assert_eq!(String::from_utf8_lossy(&v), "XXXX\"");
 /// ```
 pub fn insert_before_separator<T>(
     input: &mut Vec<u8>,
@@ -419,8 +476,8 @@ where
     input.reserve(other.len() + 1);
 
     if input.is_empty() {
-        input.push(sep);
         input.extend_from_slice(other);
+        input.push(sep);
         return Some(0);
     }
 
@@ -447,10 +504,13 @@ where
 /// Delete data between two separators
 /// Returns range of deleted data.
 ///
-/// ```rust,ignore
+/// ```rust
+/// # use snapchange::mutators::text::helpers::*;
+/// # let mut rngi = snapchange::utils::MockRng::new(&[]);
+/// # let mut rng = &mut rngi;
 /// let mut v = b"asdf\nbsdf\n".to_vec();
 /// delete_between_separator(&mut v, b'\n', rng);
-/// assert!(v == b"asdf\n" || v == b"bsdf\n");
+/// assert_eq!(String::from_utf8_lossy(&v), "asdf\n");
 /// ```
 #[inline]
 pub fn delete_between_separator<T>(
@@ -489,12 +549,20 @@ where
     Some((start_offset, end_offset))
 }
 
-/// Duplicate data between two separators.
+/// Duplicate data between two separators, e.g., can be used to duplicate a line or a word.
 ///
-/// ```rust,ignore
+/// ```rust
+/// # use snapchange::mutators::text::helpers::*;
+/// # let mut rngi = snapchange::utils::MockRng::default();
+/// # let mut rng = &mut rngi;
+/// // duplicate a line
 /// let mut v = b"asdf\nbsdf\n".to_vec();
 /// dup_between_separator(&mut v, b'\n', rng);
-/// assert!(v == b"asdf\nasdf\nbsdf\n" || v == b"asdf\nbsdf\nbsdf\n");
+/// assert_eq!(v, b"asdf\nbsdf\nbsdf\n");
+/// // duplicate a word
+/// let mut v = b"asdf bsdf".to_vec();
+/// dup_between_separator(&mut v, b' ', rng);
+/// assert_eq!(v, b"asdf bsdf bsdf");
 /// ```
 #[inline]
 pub fn dup_between_separator<T>(
@@ -525,13 +593,21 @@ where
     let end_offset = if let Some(o) = sep_idx.get(start + 1) {
         *o
     } else {
-        input.push(sep);
         input.len()
     };
 
     // let src = &input[start_offset..end_offset];
     // input.splice(end_offset..end_offset, src.iter().copied());
-    crate::utils::vec::insert_from_within(input, end_offset, start_offset..end_offset);
+    if rng.gen_bool(0.8) {
+        // duplicate once with high prob
+        crate::utils::vec::insert_from_within(input, end_offset, start_offset..end_offset);
+    } else {
+        // duplicate a couple of times
+        let times: usize = rng.gen_range(2..16);
+        for _ in 0..times {
+            crate::utils::vec::insert_from_within(input, end_offset, start_offset..end_offset);
+        }
+    }
 
     Some((start_offset, end_offset))
 }

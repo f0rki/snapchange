@@ -385,7 +385,7 @@ pub mod vec {
     /// * if `index` is out of bounds
     /// * if `src_range` is out of bounds
     /// * if `index` is within `src_range`
-    /// 
+    ///
     /// # Examples:
     ///
     /// ```rust
@@ -436,12 +436,13 @@ pub mod vec {
             std::ops::Bound::Included(t) => *t + 1,
         }
         .min(dst.len());
-        if src_start == src_end { // no-op
+        if src_start == src_end {
+            // no-op
             return;
         }
         assert!(src_start < src_end);
         assert!(index <= src_start || index >= src_end);
-        
+
         let copy_len = src_end - src_start;
         let src_start = if index <= src_start {
             // adjust start offset
@@ -458,7 +459,10 @@ pub mod vec {
         // SAFETY: we reserved enough space to stay within bounds.
         unsafe {
             // move data back to make space.
-            let dst_ptr = dst.as_mut_ptr().offset(index as isize).offset(copy_len as isize);
+            let dst_ptr = dst
+                .as_mut_ptr()
+                .offset(index as isize)
+                .offset(copy_len as isize);
             let src_ptr = dst.as_ptr().offset(index as isize);
             std::ptr::copy(src_ptr, dst_ptr, old_len - index);
             // copy the data within.
@@ -887,4 +891,54 @@ pub fn write_crash_input<T: FuzzInput>(
 /// ```
 pub fn custom_crash<T: Into<String>>(crash_name: T) -> Result<Execution> {
     Ok(Execution::new_crash(crash_name))
+}
+
+pub use rand;
+pub use rand::RngCore;
+
+/// A RNG implementation useful for testing.
+/// A fake rng that spits out deterministic numbers.
+#[derive(Default)]
+pub struct MockRng {
+    buf: Vec<u32>,
+}
+
+impl MockRng {
+    /// create new based on given slice of numbers; will be used in reverse
+    pub fn new(buf: &[u32]) -> Self {
+        Self { buf: buf.to_vec() }
+    }
+
+    /// push a value to the underlying vector
+    pub fn push(&mut self, v: u32) {
+        self.buf.push(v);
+    }
+}
+
+impl<'a> RngCore for MockRng {
+    fn next_u32(&mut self) -> u32 {
+        // #[cfg(test)]
+        // println!("sampling {:?}", self.buf.last());
+        if let Some(x) = self.buf.pop() {
+            x
+        } else {
+            0
+        }
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        let lo: u64 = self.next_u32() as u64;
+        let hi: u64 = self.next_u32() as u64;
+        hi << 32 | lo
+    }
+
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        for i in 0..dest.len() {
+            dest[i] = self.next_u32() as u8;
+        }
+    }
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
+        self.fill_bytes(dest);
+        Ok(())
+    }
 }
