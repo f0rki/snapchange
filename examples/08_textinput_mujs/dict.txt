@@ -84,6 +84,30 @@ toString
 undefined
 valueOf
 
+
+Math.round
+Math.pow
+Math.sqrt
+Math.abs
+math.ceil
+Math.floor
+Math.sin
+Math.cos
+Math.max
+Math.min
+
+Array.forEach
+Array.map
+Array.filter
+Array.reduce
+Array.reduceRight
+Array.every
+Array.some
+Array.indexOf
+Array.lastIndexOf
+Array.find
+Array.findIndex
+
 +
 -
 *
@@ -112,10 +136,38 @@ valueOf
 ;
 
 ()
+(0)
+(1)
+("a")
+(0, 0)
+(1, 1)
+("a", "a")
+(0, 0, 0)
+(1, 1, 1)
+("a", "a", "a")
+(0, 0, 0, 0)
+(1, 1, 1, 1)
+("a", "a", "a", "a")
+(0, 0, 0, 0, 0)
+(1, 1, 1, 1, 1)
+("a", "a", "a", "a", "a")
+
+
 [0]
 [1]
+[-1]
 
-Math.pow
+[0, 0]
+[0, 0, 0]
+[0, 0, 0, 0]
+[0, 0, 0, 0, 0]
+
+{"name": "john", "surname": "doe", "age": 30}
+{}
+
+function(){}
+
+var a = function(){};
 
 0.0
 1e10

@@ -16,7 +16,7 @@ impl Fuzzer for JSTextFuzzer {
     type Input = TextInput;
     const START_ADDRESS: u64 = constants::RIP;
     const MAX_INPUT_LENGTH: usize = 0x4000;
-    const MAX_MUTATIONS: u64 = 16;
+    const MAX_MUTATIONS: u64 = 4;
 
     fn set_input(
         &mut self,
@@ -41,6 +41,7 @@ impl Fuzzer for JSTextFuzzer {
             "ld-musl-x86_64.so.1!fprintf",
             "ld-musl-x86_64.so.1!printf",
             "ld-musl-x86_64.so.1!putchar",
+            // "mujs_harness!jsB_print",
         ] {
             if fuzzvm
                 .patch_bytes_permanent(AddressLookup::SymbolOffset(sym, 0), &[0xc3])
@@ -53,5 +54,12 @@ impl Fuzzer for JSTextFuzzer {
         }
 
         Ok(())
+    }
+
+    fn reset_breakpoints(&self) -> Option<&[AddressLookup]> {
+        Some(&[
+            AddressLookup::SymbolOffset("ld-musl-x86_64.so.1!exit", 0),
+            // AddressLookup::SymbolOffset("mujs_harness!stop", 0)
+        ])
     }
 }

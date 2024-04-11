@@ -14,7 +14,8 @@ static void jsB_gc(js_State *J) {
 }
 
 static void jsB_print(js_State *J) {
-  int i, top = js_gettop(J);
+  int i = 0;
+  int top = js_gettop(J);
   for (i = 1; i < top; ++i) {
     const char *s = js_tostring(J, i);
     if (i > 1)
@@ -28,14 +29,19 @@ static void jsB_print(js_State *J) {
 int64_t magic_values[] = {0xdeadbeef, 0xcafecafe, 0x42424242, 0x41414141};
 
 static void magic(js_State *J) {
-  if (js_isnumber(J, 1)) {
-    double idx = js_tonumber(J, 1);
-    if (idx < 4) {
-      js_pushnumber(J, (double)magic_values[(int)idx]);
-      return;
+  if (js_gettop(J) > 0) {
+    if (js_isnumber(J, 1)) {
+      double idx = js_tonumber(J, 1);
+      if (idx < 4) {
+        js_pushnumber(J, (double)magic_values[(unsigned int)idx]);
+        return;
+      }
     }
+    js_pushnumber(J, 0);
+  } else {
+
+    js_pushundefined(J);
   }
-  js_pushnumber(J, 0);
 }
 
 int party_counter = 0;
@@ -46,7 +52,7 @@ static void party(js_State *J) {
     if (js_isnumber(J, i)) {
       int val = (int)js_tonumber(J, i);
       party_counter += val;
-      if (party_counter > 43) {
+      if (party_counter > 1000) {
         party_counter = 0;
       }
       if (party_counter > 42) {
@@ -120,6 +126,11 @@ static char *read_stdin(void) {
   return s;
 }
 
+void stop(int status) {
+  puts("\n...bye");
+  exit(status);
+}
+
 int main(int argc, char **argv) {
   char *input = NULL;
   js_State *J = NULL;
@@ -162,7 +173,7 @@ int main(int argc, char **argv) {
 
     // Snapshot taken here
     __asm("int3");
-    sleep(1);
+    sleep(3);
     __asm("vmcall");
 
   } else {
@@ -180,5 +191,5 @@ int main(int argc, char **argv) {
   js_gc(J, 0);
   js_freestate(J);
 
-  exit(status);
+  stop(status);
 }

@@ -1,8 +1,14 @@
 ifeq ($(origin CC),default)
 CC = clang
 endif
-# CFLAGS ?= -O3 -ggdb -fuse-ld=lld -fsanitize=address -fno-omit-frame-pointer -flto
-CFLAGS ?= -O3 -ggdb -fuse-ld=lld -fno-omit-frame-pointer -flto
+CFLAGS ?= -O3 -ggdb -fno-omit-frame-pointer
+# CFLAGS ?= -O3 -ggdb -fuse-ld=lld -fno-omit-frame-pointer -flto
+USE_ASAN ?= 0
+
+all: mujs_harness mujs_harness.asan
+ifeq ($(USE_ASAN),1)
+	mv mujs_harness.asan mujs_harness
+endif
 
 mujs_harness: main.c mujs-1.3.4 Makefile
 	$(CC) $(CFLAGS) -o $@ $< ./mujs-1.3.4/one.c -I./mujs-1.3.4/ -lm
